@@ -1,18 +1,34 @@
-from krita import Krita, Extension  # type: ignore
+from krita import Krita, DockWidget, DockWidgetFactory, DockWidgetFactoryBase  # type: ignore
+from PyQt5.QtWidgets import *
+from PyQt5.QtCore import *
 
 
-class TestExtension(Extension):
+class ComfyKritaSyncDocker(DockWidget):
 
-    def __init__(self, parent):
-        # This is initialising the parent, always important when subclassing.
-        super().__init__(parent)
+    def __init__(self):
+        super().__init__()
+        self.setWindowTitle("ComfyUI-Krita Sync")
+        main_widget = QWidget(self)
+        self.setWidget(main_widget)
 
-    def setup(self):
+        self.text = QLabel("Status: Disconnected")
+        self.button_connect = QPushButton("Connect", main_widget)
+
+        main_widget.setLayout(QVBoxLayout())
+        main_widget.layout().addWidget(self.text)
+        main_widget.layout().addWidget(self.button_connect)
+
+        self.button_connect.clicked.connect(self.comfy_connect)
+
+    def canvasChanged(self, canvas):
         pass
 
-    def createActions(self, window):
-        pass
+    @pyqtSlot()
+    def comfy_connect(self):
+        self.text.setText("Status: Connected")
+        self.button_connect.setEnabled(False)
 
 
-# And add the extension to Krita's list of extensions:
-Krita.instance().addExtension(TestExtension(Krita.instance()))
+Krita.instance().addDockWidgetFactory(
+    DockWidgetFactory("comfyKritaSyncDocker", DockWidgetFactoryBase.DockRight, ComfyKritaSyncDocker)
+)
