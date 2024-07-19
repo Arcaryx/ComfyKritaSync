@@ -13,7 +13,6 @@ function debounce(func, wait = 300) {
 app.registerExtension({
     name: "cksync.updated",
     async setup() {
-        // Debounce the callback function
         const debouncedCallback = debounce(async (event) => {
             await api.fetchApi("/cksync/updated", {
                 method: "POST",
@@ -22,7 +21,7 @@ app.registerExtension({
                 },
                 body: JSON.stringify(event.detail)
             })
-        }, 2000); // Adjust the delay as needed
+        }, 2000);
 
         api.addEventListener("graphChanged", debouncedCallback);
     },
