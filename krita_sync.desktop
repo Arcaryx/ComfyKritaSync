@@ -1,8 +1,7 @@
 [Desktop Entry]
 Type=Service
 ServiceTypes=Krita/PythonPlugin
-X-KDE-Library=krita
+X-KDE-Library=krita_sync
 X-Python-2-Compatible=false
-X-Krita-Manual=manual.html
-Name=ComfyKritaSync
+Name=ComfyUI Krita Sync
 Comment=Sync ComfyUI workflows to Krita

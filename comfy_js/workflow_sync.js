@@ -11,10 +11,10 @@ function debounce(func, wait = 300) {
 }
 
 app.registerExtension({
-    name: "cksync.updated",
+    name: "comfy_sync.updated",
     async setup() {
         const debouncedCallback = debounce(async (event) => {
-            await api.fetchApi("/cksync/updated", {
+            await api.fetchApi("/comfy_sync/updated", {
                 method: "POST",
                 headers: {
                     "Content-Type": "application/json",
