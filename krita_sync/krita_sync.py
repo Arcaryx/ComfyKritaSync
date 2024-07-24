@@ -10,8 +10,9 @@ class ComfyKritaSyncExtension(Extension):
         # Init
 
     def setup(self):
-        client = KritaClient.instance()
-        client.run(client.connect())
+        pass
+        # client = KritaClient.instance()
+        # client.run(client.connect())
         # Startup
 
     def shutdown(self):
@@ -47,8 +48,15 @@ class ComfyKritaSyncDocker(DockWidget):
 
     @pyqtSlot()
     def comfy_connect(self):
-        self.text.setText("Status: Connected")
-        self.button_connect.setEnabled(False)
+        client = KritaClient.instance()
+        if client.is_connected():
+            client.run(client.disconnect())
+            self.text.setText("Status: Disconnected")
+            self.button_connect.setText("Connect")
+        else:
+            client.run(client.connect())
+            self.text.setText("Status: Connected")
+            self.button_connect.setText("Disconnect")
 
 
 Krita.instance().addExtension(ComfyKritaSyncExtension(Krita.instance()))
