@@ -1,9 +1,10 @@
-from .comfy_sync import comfy_sync
+from .comfy_sync import nodes, server
 
-NODE_CLASS_MAPPINGS = {}
-NODE_DISPLAY_NAME_MAPPINGS = {}
-WEB_DIRECTORY = "./comfy_js"
+NODE_CLASS_MAPPINGS = {
+    "CKS_SendImageKrita": nodes.SendImageKrita
+}
+NODE_DISPLAY_NAME_MAPPINGS = {
+    "CKS_SendImageKrita": "Send Image to Krita",
+}
 
-__all__ = ["NODE_CLASS_MAPPINGS", "NODE_DISPLAY_NAME_MAPPINGS", "WEB_DIRECTORY"]
-
-print("ComfyKritaSync Loaded")
+__all__ = ["NODE_CLASS_MAPPINGS", "NODE_DISPLAY_NAME_MAPPINGS"]

@@ -1,6 +1,28 @@
-from krita import Krita, DockWidget, DockWidgetFactory, DockWidgetFactoryBase  # type: ignore
+from krita import Krita, Extension, DockWidget, DockWidgetFactory, DockWidgetFactoryBase  # type: ignore
 from PyQt5.QtWidgets import *
 from PyQt5.QtCore import *
+from krita_sync.client_krita import KritaClient
+
+
+class ComfyKritaSyncExtension(Extension):
+    def __init__(self, parent):
+        super().__init__(parent)
+        # Init
+
+    def setup(self):
+        client = KritaClient.instance()
+        client.run(client.connect())
+        # Startup
+
+    def shutdown(self):
+        KritaClient.instance().loop.stop()
+        KritaClient.instance().loop.close()
+        # Shutdown
+        pass
+
+    def createActions(self, window):
+        # Actions
+        pass
 
 
 class ComfyKritaSyncDocker(DockWidget):
@@ -29,6 +51,7 @@ class ComfyKritaSyncDocker(DockWidget):
         self.button_connect.setEnabled(False)
 
 
+Krita.instance().addExtension(ComfyKritaSyncExtension(Krita.instance()))
 Krita.instance().addDockWidgetFactory(
-    DockWidgetFactory("comfyKritaSyncDocker", DockWidgetFactoryBase.DockRight, ComfyKritaSyncDocker)
+    DockWidgetFactory("comfyKritaSync", DockWidgetFactoryBase.DockRight, ComfyKritaSyncDocker)
 )
