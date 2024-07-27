@@ -37,15 +37,20 @@ class KritaClient(QObject):
             cls._instance = KritaClient()
         return cls._instance
 
+    # FIXME: We're not getting errors/logs at all when websockets fail to connect
     async def connect(self):
-        async for self._websocket in ws_client.connect(f"ws://127.0.0.1:8188/krita-sync-ws?clientId={self._id}&clientType=krita", max_size=2**30, read_limit=2**30):
-            try:
-                self.websocket_updated.emit(True)
-                async for message in self._websocket:
-                    print(message)
-            except Exception as e:
-                continue
-            break
+        try:
+            async for self._websocket in ws_client.connect(f"ws://127.0.0.1:8188/krita-sync-ws?clientId={self._id}&clientType=krita", max_size=2**30, read_limit=2**30):
+                try:
+                    self.websocket_updated.emit(True)
+                    async for message in self._websocket:
+                        print(message)
+                except Exception as e:
+                    print("Exception while processing ws messages", e)
+                    continue
+                break
+        except Exception as e:
+            print("Exception while connecting to ws", e)
         self._websocket = None
         self.websocket_updated.emit(False)
 

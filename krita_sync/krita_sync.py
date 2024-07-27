@@ -55,6 +55,7 @@ class ComfyKritaSyncDocker(DockWidget):
         if is_connected:
             client.run(client.disconnect())
         else:
+            # FIXME: This needs to only be allowed to run once at a time before getting an actual failure back, etc;
             client.run(client.connect())
 
     def websocket_updated(self, is_connected):
