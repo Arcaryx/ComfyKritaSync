@@ -1,9 +1,15 @@
 from __future__ import annotations
 
 import asyncio
+import struct
 import uuid
+
+from PIL import Image
+from PyQt5.QtGui import QImage
+
 from .websockets.src.websockets import client as ws_client
-from PyQt5.QtCore import QThread, pyqtSignal, QObject
+from PyQt5.QtCore import QThread, pyqtSignal, QObject, QByteArray
+from krita import Krita  # type: ignore
 
 
 class LoopThread(QThread):
@@ -14,6 +20,16 @@ class LoopThread(QThread):
     def run(self):
         asyncio.set_event_loop(self._loop)
         self._loop.run_forever()
+
+
+def _extract_message_png_image(data: memoryview):
+    s = struct.calcsize(">II")
+    if len(data) > s:
+        event, format = struct.unpack_from(">II", data)
+        # ComfyUI server.py: BinaryEventTypes.PREVIEW_IMAGE=1, PNG=2
+        if event == 1 and format == 2:
+            return QImage.fromData(data[s:], None)
+    return None
 
 
 class KritaClient(QObject):
@@ -37,6 +53,21 @@ class KritaClient(QObject):
             cls._instance = KritaClient()
         return cls._instance
 
+    def create(
+        self,
+        doc: Krita.Document,
+        name: str,
+        img: QImage | None = None,
+    ):
+        node = doc.createNode(name, "paintlayer")
+        if img:
+            converted_image = img.convertToFormat(QImage.Format.Format_ARGB32)
+            ptr = converted_image.constBits()
+            converted_image_bytes = QByteArray(ptr.asstring(converted_image.byteCount()))
+            node.setPixelData(converted_image_bytes, 0, 0, 1024, 1024)
+            root = doc.rootNode()
+            root.addChildNode(node, None)
+
     # FIXME: We're not getting errors/logs at all when websockets fail to connect
     async def connect(self):
         try:
@@ -44,7 +75,15 @@ class KritaClient(QObject):
                 try:
                     self.websocket_updated.emit(True)
                     async for message in self._websocket:
-                        print(message)
+                        if isinstance(message, bytes):
+                            image = _extract_message_png_image(memoryview(message))
+                            documents = Krita.instance().documents()
+                            if image is not None and len(documents) > 0:
+                                document = documents[0]
+                                self.create(document, "test", image)
+
+                        elif isinstance(message, str):
+                            print(message)
                 except Exception as e:
                     print("Exception while processing ws messages", e)
                     continue
