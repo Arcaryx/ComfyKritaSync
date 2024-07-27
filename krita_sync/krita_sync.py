@@ -41,22 +41,30 @@ class ComfyKritaSyncDocker(DockWidget):
         main_widget.layout().addWidget(self.text)
         main_widget.layout().addWidget(self.button_connect)
 
-        self.button_connect.clicked.connect(self.comfy_connect)
+        self.button_connect.clicked.connect(self.toggle_connection)
+
+        client = KritaClient.instance()
+        client.websocket_updated.connect(self.websocket_updated)
 
     def canvasChanged(self, canvas):
         pass
 
     @pyqtSlot()
-    def comfy_connect(self):
+    def toggle_connection(self):
         client = KritaClient.instance()
-        if client.is_connected():
+        is_connected = client.is_connected()
+        if is_connected:
             client.run(client.disconnect())
-            self.text.setText("Status: Disconnected")
-            self.button_connect.setText("Connect")
         else:
             client.run(client.connect())
+
+    def websocket_updated(self, is_connected):
+        if is_connected:
             self.text.setText("Status: Connected")
             self.button_connect.setText("Disconnect")
+        else:
+            self.text.setText("Status: Disconnected")
+            self.button_connect.setText("Connect")
 
 
 Krita.instance().addExtension(ComfyKritaSyncExtension(Krita.instance()))
