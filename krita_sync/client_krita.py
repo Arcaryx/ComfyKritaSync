@@ -62,9 +62,10 @@ class KritaClient(QObject):
         node = doc.createNode(name, "paintlayer")
         if img:
             converted_image = img.convertToFormat(QImage.Format.Format_ARGB32)
+
             ptr = converted_image.constBits()
             converted_image_bytes = QByteArray(ptr.asstring(converted_image.byteCount()))
-            node.setPixelData(converted_image_bytes, 0, 0, 1024, 1024)
+            node.setPixelData(converted_image_bytes, 0, 0, converted_image.width(), converted_image.height())
             root = doc.rootNode()
             root.addChildNode(node, None)
 
