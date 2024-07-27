@@ -10,10 +10,8 @@ class ComfyKritaSyncExtension(Extension):
         # Init
 
     def setup(self):
-        pass
-        # client = KritaClient.instance()
-        # client.run(client.connect())
-        # Startup
+        client = KritaClient.instance()
+        client.run(client.connect())
 
     def shutdown(self):
         KritaClient.instance().loop.stop()
@@ -45,6 +43,7 @@ class ComfyKritaSyncDocker(DockWidget):
 
         client = KritaClient.instance()
         client.websocket_updated.connect(self.websocket_updated)
+        self.websocket_updated(client.is_connected())
 
     def canvasChanged(self, canvas):
         pass
