@@ -27,14 +27,12 @@ class LoopThread(QThread):
         self._loop.run_forever()
 
 
-def _extract_message_png_image(decoded_message: CksBinaryMessage):
-    if decoded_message.payloads[1]:
-        (payload_type, content) = decoded_message.payloads[1]
-        if payload_type == PayloadType.PNG:
-            return QImage.fromData(content, None)
-        else:
-            return None
-    return None
+def _extract_message_png_image(payload):
+    (payload_type, content) = payload
+    if payload_type == PayloadType.PNG:
+        return QImage.fromData(content, None)
+    else:
+        return None
 
 
 class KritaClient(QObject):
@@ -89,11 +87,16 @@ class KritaClient(QObject):
                             print(decoded_message.payloads[0])
 
                             if len(decoded_message.payloads) > 1:
-                                image = _extract_message_png_image(decoded_message)
                                 documents = Krita.instance().documents()
-                                if image is not None and len(documents) > 0:
+                                if len(documents) > 0:
                                     document = documents[0]
-                                    self.create(document, "test", image)
+
+                                    created_layer_index = 1
+                                    for payload in decoded_message.payloads[1:]:
+                                        image = _extract_message_png_image(payload)
+                                        if image is not None:
+                                            self.create(document, f"test-{created_layer_index}", image)
+                                            created_layer_index += 1
 
                         elif isinstance(message, str):
                             print(message)

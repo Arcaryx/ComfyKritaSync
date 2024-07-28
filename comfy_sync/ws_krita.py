@@ -43,6 +43,8 @@ class KritaWsManager:
             bytes_io = BytesIO()
             image_data.save(bytes_io, format="PNG")
             cks_message.add_payload('png', bytes_io.getvalue())
+            # FIXME: Remove testing code/dupe image
+            cks_message.add_payload('png', bytes_io.getvalue())
 
         cks_message_bytes = cks_message.encode_message()
 
