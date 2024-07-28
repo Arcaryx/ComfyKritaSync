@@ -20,7 +20,8 @@ async def krita_websocket_handler(request):
     ws_krita.KritaWsManager.instance().sockets[sid] = ws
 
     try:
-        await ws_krita.KritaWsManager.instance().send("status", {"status": "CONNECTED-HELLO-ARCA", 'sid': sid}, sid)
+        json_data = {"status": "CONNECTED-HELLO-ARCA", 'sid': sid}
+        await ws_krita.KritaWsManager.instance().send(json_data, sid=sid)
 
         async for msg in ws:
             if msg.type == WSMsgType.ERROR:

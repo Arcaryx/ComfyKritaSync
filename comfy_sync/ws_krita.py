@@ -2,9 +2,10 @@ from __future__ import annotations
 
 import asyncio
 import struct
-from server import BinaryEventTypes, PromptServer, send_socket_catch_exception  # type: ignore
 from io import BytesIO
-from PIL import Image, ImageOps
+
+from server import BinaryEventTypes, PromptServer, send_socket_catch_exception  # type: ignore
+from ..krita_sync.cks_common import CksBinaryMessage
 
 
 def encode_bytes(event, data):
@@ -32,63 +33,31 @@ class KritaWsManager:
             cls._instance = KritaWsManager()
         return cls._instance
 
-    async def send(self, event, data, sid=None):
-        if event == BinaryEventTypes.UNENCODED_PREVIEW_IMAGE:
-            await self.send_image(data, sid=sid)
-        elif isinstance(data, (bytes, bytearray)):
-            await self.send_bytes(event, data, sid)
-        else:
-            await self.send_json(event, data, sid)
+    async def send(self, json_data, image_data=None, sid=None):
+        print(f"sending json_data: {json_data}")
+        cks_message = CksBinaryMessage()
 
-    async def send_image(self, image_data, sid=None):
-        image_type = image_data[0]
-        image = image_data[1]
-        max_size = image_data[2]
-        if max_size is not None:
-            if hasattr(Image, 'Resampling'):
-                resampling = Image.Resampling.BILINEAR
-            else:
-                resampling = Image.ANTIALIAS
+        cks_message.add_payload('json', json_data)
 
-            image = ImageOps.contain(image, (max_size, max_size), resampling)
-        type_num = 1
-        if image_type == "JPEG":
-            type_num = 1
-        elif image_type == "PNG":
-            type_num = 2
+        if image_data is not None:
+            bytes_io = BytesIO()
+            image_data.save(bytes_io, format="PNG")
+            cks_message.add_payload('png', bytes_io.getvalue())
 
-        bytes_io = BytesIO()
-        header = struct.pack(">I", type_num)
-        bytes_io.write(header)
-        image.save(bytes_io, format=image_type, quality=95, compress_level=1)
-        preview_bytes = bytes_io.getvalue()
-        await self.send_bytes(BinaryEventTypes.PREVIEW_IMAGE, preview_bytes, sid=sid)
-
-    async def send_bytes(self, event, data, sid=None):
-        message = encode_bytes(event, data)
+        cks_message_bytes = cks_message.encode_message()
 
         if sid is None:
             sockets = list(self.sockets.values())
             for ws in sockets:
-                await send_socket_catch_exception(ws.send_bytes, message)
+                await ws.send_bytes(cks_message_bytes)
         elif sid in self.sockets:
-            await send_socket_catch_exception(self.sockets[sid].send_bytes, message)
+            await self.sockets[sid].send_bytes(cks_message_bytes)
 
-    async def send_json(self, event, data, sid=None):
-        message = {"type": event, "data": data}
-
-        if sid is None:
-            sockets = list(self.sockets.values())
-            for ws in sockets:
-                await send_socket_catch_exception(ws.send_json, message)
-        elif sid in self.sockets:
-            await send_socket_catch_exception(self.sockets[sid].send_json, message)
-
-    def send_sync(self, event, data, sid=None):
+    def send_sync(self, json_data, image_data=None, sid=None):
         print("Send_sync")
         self.loop.call_soon_threadsafe(
             self.messages.put_nowait,
-            (event, data, sid)
+            (json_data, image_data, sid)
         )
 
     async def publish_loop(self):

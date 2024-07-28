@@ -1,15 +1,20 @@
 from __future__ import annotations
 
 import asyncio
-import struct
+import time
 import uuid
 
-from PIL import Image
-from PyQt5.QtGui import QImage
-
-from .websockets.src.websockets import client as ws_client
 from PyQt5.QtCore import QThread, pyqtSignal, QObject, QByteArray
+from PyQt5.QtGui import QImage
 from krita import Krita  # type: ignore
+
+from .cks_common.CksBinaryMessage import CksBinaryMessage, PayloadType
+from .websockets.src.websockets import client as ws_client
+import traceback
+
+
+def print_exception_trace(exception):
+    traceback.print_exception(type(exception), exception, exception.__traceback__)
 
 
 class LoopThread(QThread):
@@ -22,13 +27,13 @@ class LoopThread(QThread):
         self._loop.run_forever()
 
 
-def _extract_message_png_image(data: memoryview):
-    s = struct.calcsize(">II")
-    if len(data) > s:
-        event, format = struct.unpack_from(">II", data)
-        # ComfyUI server.py: BinaryEventTypes.PREVIEW_IMAGE=1, PNG=2
-        if event == 1 and format == 2:
-            return QImage.fromData(data[s:], None)
+def _extract_message_png_image(decoded_message: CksBinaryMessage):
+    if decoded_message.payloads[1]:
+        (payload_type, content) = decoded_message.payloads[1]
+        if payload_type == PayloadType.PNG:
+            return QImage.fromData(content, None)
+        else:
+            return None
     return None
 
 
@@ -54,10 +59,10 @@ class KritaClient(QObject):
         return cls._instance
 
     def create(
-        self,
-        doc: Krita.Document,
-        name: str,
-        img: QImage | None = None,
+            self,
+            doc: Krita.Document,
+            name: str,
+            img: QImage | None = None,
     ):
         node = doc.createNode(name, "paintlayer")
         if img:
@@ -72,21 +77,30 @@ class KritaClient(QObject):
     # FIXME: We're not getting errors/logs at all when websockets fail to connect
     async def connect(self):
         try:
-            async for self._websocket in ws_client.connect(f"ws://127.0.0.1:8188/krita-sync-ws?clientId={self._id}&clientType=krita", max_size=2**30, read_limit=2**30):
+            async for self._websocket in ws_client.connect(
+                    f"ws://127.0.0.1:8188/krita-sync-ws?clientId={self._id}&clientType=krita", max_size=2 ** 30,
+                    read_limit=2 ** 30):
                 try:
                     self.websocket_updated.emit(True)
                     async for message in self._websocket:
+                        print("Got a websocket message")
                         if isinstance(message, bytes):
-                            image = _extract_message_png_image(memoryview(message))
-                            documents = Krita.instance().documents()
-                            if image is not None and len(documents) > 0:
-                                document = documents[0]
-                                self.create(document, "test", image)
+                            decoded_message = CksBinaryMessage.decode_message(message)
+                            print(decoded_message.payloads[0])
+
+                            if len(decoded_message.payloads) > 1:
+                                image = _extract_message_png_image(decoded_message)
+                                documents = Krita.instance().documents()
+                                if image is not None and len(documents) > 0:
+                                    document = documents[0]
+                                    self.create(document, "test", image)
 
                         elif isinstance(message, str):
                             print(message)
                 except Exception as e:
-                    print("Exception while processing ws messages", e)
+                    print_exception_trace(e)
+                    print("Exception while processing ws messages, waiting 5 seconds before attempting to reconnect")
+                    time.sleep(5)
                     continue
                 break
         except Exception as e:

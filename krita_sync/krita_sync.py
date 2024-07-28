@@ -1,3 +1,5 @@
+import uuid
+
 from krita import Krita, Extension, DockWidget, DockWidgetFactory, DockWidgetFactoryBase  # type: ignore
 from PyQt5.QtWidgets import *
 from PyQt5.QtCore import *
@@ -28,6 +30,7 @@ class ComfyKritaSyncDocker(DockWidget):
 
     def __init__(self):
         super().__init__()
+        self.uuid = uuid.uuid4().hex
         self.setWindowTitle("ComfyUI-Krita Sync")
         main_widget = QWidget(self)
         self.setWidget(main_widget)

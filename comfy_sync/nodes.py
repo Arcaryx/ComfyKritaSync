@@ -34,8 +34,8 @@ class SendImageKrita:
             # Send to Krita client
             manager = ws_krita.KritaWsManager.instance()
             manager.send_sync(
-                BinaryEventTypes.UNENCODED_PREVIEW_IMAGE,
-                ["PNG", image, None],
+                {"testkey": "testvalue"},
+                image,
                 # TODO: This needs to contain the Krita document to target
             )
 
