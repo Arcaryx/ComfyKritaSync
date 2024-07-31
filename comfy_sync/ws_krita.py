@@ -40,9 +40,10 @@ class KritaWsManager:
         cks_message.add_payload('json', json_data)
 
         if image_data is not None:
-            bytes_io = BytesIO()
-            image_data.save(bytes_io, format="PNG")
-            cks_message.add_payload('png', bytes_io.getvalue())
+            for image in image_data:
+                bytes_io = BytesIO()
+                image.save(bytes_io, format="PNG")
+                cks_message.add_payload('png', bytes_io.getvalue())
 
         cks_message_bytes = cks_message.encode_message()
 

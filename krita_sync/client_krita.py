@@ -84,6 +84,7 @@ class KritaClient(QObject):
                         print("Got a websocket message")
                         if isinstance(message, bytes):
                             decoded_message = CksBinaryMessage.decode_message(message)
+                            print(f"Total payloads: {len(decoded_message.payloads)}")
                             print(decoded_message.payloads[0])
 
                             if len(decoded_message.payloads) > 1:

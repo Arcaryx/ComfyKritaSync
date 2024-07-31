@@ -33,9 +33,12 @@ class SendImageKrita:
         full_output_folder, filename, counter, subfolder, filename_prefix = folder_paths.get_save_image_path(
             filename_prefix, folder_paths.get_temp_directory(), images[0].shape[1], images[0].shape[0])
         results = []
+        images = []
         for tensor in images:
             array = 255.0 * tensor.cpu().numpy()
             image = Image.fromarray(np.clip(array, 0, 255).astype(np.uint8))
+            images.append(image)
+
             metadata = None
             if not args.disable_metadata:
                 metadata = PngInfo()
@@ -47,21 +50,22 @@ class SendImageKrita:
             file = f"{filename}_{counter:05}_.png"
             image.save(os.path.join(full_output_folder, file), pnginfo=metadata, compress_level=1)
 
-            # Send to Krita client
-            # TODO: Should send all images once instead of sending images one at a time?
-            manager = ws_krita.KritaWsManager.instance()
-            manager.send_sync(
-                {"testkey": "testvalue"},
-                image,
-                # TODO: This needs to contain the Krita document to target
-            )
-
             results.append({
                 "filename": file,
                 "subfolder": subfolder,
                 "type": "temp"
             })
             counter += 1
+
+        # Send to Krita client
+        # TODO: Should send all images once instead of sending images one at a time?
+        manager = ws_krita.KritaWsManager.instance()
+        manager.send_sync(
+            {"testkey": "testvalue"},
+            images,
+            # TODO: This needs to contain the Krita document to target
+        )
+
         return {"ui": {"images": results}}
 
 
