@@ -9,6 +9,7 @@ from PIL.PngImagePlugin import PngInfo
 from server import PromptServer, BinaryEventTypes  # type: ignore
 from . import ws_krita
 from comfy.cli_args import args  # type: ignore
+from ..krita_sync.cks_common.CksBinaryMessage import MessageType
 
 
 class SendImageKrita:
@@ -60,9 +61,12 @@ class SendImageKrita:
         # TODO: Should send all images once instead of sending images one at a time?
         manager = ws_krita.KritaWsManager.instance()
         manager.send_sync(
-            {"testkey": "testvalue"},
-            result_images,
-            # TODO: This needs to contain the Krita document to target
+            MessageType.SendImageKrita,
+            {
+                "KritaDocument": "image.png",  # TODO: This needs to contain the Krita document to target
+                "RunUuid": "TODO"
+            },
+            result_images
         )
 
         return {"ui": {"images": results}}
@@ -72,10 +76,14 @@ class GetImageKrita:
     @classmethod
     def INPUT_TYPES(s):
         # TODO: Get list of documents from Krita clients, this will need to be refreshed when new documents are opened
-        documents = ["image1.png", "image2.png", "image3.png"]
+        #documents = ["image1.png", "image2.png", "image3.png"]
+        #return {"required": {
+        #    "document": (documents,),
+        #    "layer": ("STRING", {"default": "example layer"}, {"multiline": False})
+        #}}
         return {"required": {
-            "document": (documents,),
-            "layer": ("STRING", {"default": "example layer"}, {"multiline": False})
+           "document": ("STRING", {"default": "Unnamed"}, {"multiline": False}),
+           "layer": ("STRING", {"default": "example layer"}, {"multiline": False})
         }}
 
     RETURN_TYPES = ("IMAGE",)
@@ -85,6 +93,15 @@ class GetImageKrita:
 
     def get_image_krita(self, document, layer):
         results = []
+
+        manager = ws_krita.KritaWsManager.instance()
+        manager.send_sync(
+            MessageType.GetImageKrita,
+            {
+                "KritaDocument": document,  # TODO: This needs to contain the Krita document to target
+                "KritaLayer": layer
+            }
+        )
 
         # TODO: Get image from Krita websocket
         image = Image.new("RGB", (1024, 1024), (255, 255, 255))

@@ -54,8 +54,11 @@ class KritaWsManager:
         elif sid in self.sockets:
             await self.sockets[sid].send_bytes(cks_message_bytes)
 
-    def send_sync(self, json_data, image_data=None, sid=None):
-        print("Send_sync")
+    def send_sync(self, message_type, json_data=None, image_data=None, sid=None):
+        if json_data is None:
+            json_data = {"MessageType": str(message_type)}
+        else:
+            json_data["MessageType"] = str(message_type)
         self.loop.call_soon_threadsafe(
             self.messages.put_nowait,
             (json_data, image_data, sid)

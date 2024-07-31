@@ -1,11 +1,17 @@
 import json
 import base64
-from enum import Enum, auto
+from enum import Enum, IntEnum
 
 
-class PayloadType(Enum):
-    JSON = auto()
-    PNG = auto()
+class PayloadType(IntEnum):
+    JSON = 0
+    PNG = 1
+
+
+class MessageType(Enum):
+    SendImageKrita = 0
+    GetImageKrita = 1
+    DocumentSync = 2
 
 
 class CksBinaryMessage:
