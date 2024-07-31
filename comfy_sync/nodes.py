@@ -33,11 +33,11 @@ class SendImageKrita:
         full_output_folder, filename, counter, subfolder, filename_prefix = folder_paths.get_save_image_path(
             filename_prefix, folder_paths.get_temp_directory(), images[0].shape[1], images[0].shape[0])
         results = []
-        images = []
+        result_images = []
         for tensor in images:
             array = 255.0 * tensor.cpu().numpy()
             image = Image.fromarray(np.clip(array, 0, 255).astype(np.uint8))
-            images.append(image)
+            result_images.append(image)
 
             metadata = None
             if not args.disable_metadata:
@@ -62,7 +62,7 @@ class SendImageKrita:
         manager = ws_krita.KritaWsManager.instance()
         manager.send_sync(
             {"testkey": "testvalue"},
-            images,
+            result_images,
             # TODO: This needs to contain the Krita document to target
         )
 
