@@ -56,12 +56,7 @@ class KritaClient(QObject):
             cls._instance = KritaClient()
         return cls._instance
 
-    def create(
-            self,
-            doc: Krita.Document,
-            name: str,
-            img: QImage | None = None,
-    ):
+    def create(self, doc: Krita.Document, name: str, img: QImage | None = None, ):
         node = doc.createNode(name, "paintlayer")
         if img:
             converted_image = img.convertToFormat(QImage.Format.Format_ARGB32)
@@ -75,9 +70,7 @@ class KritaClient(QObject):
     # FIXME: We're not getting errors/logs at all when websockets fail to connect
     async def connect(self):
         try:
-            async for self._websocket in ws_client.connect(
-                    f"ws://127.0.0.1:8188/krita-sync-ws?clientId={self._id}&clientType=krita", max_size=2 ** 30,
-                    read_limit=2 ** 30):
+            async for self._websocket in ws_client.connect(f"ws://127.0.0.1:8188/krita-sync-ws?clientId={self._id}&clientType=krita", max_size=2 ** 30, read_limit=2 ** 30, timeout=60, ping_timeout=60):
                 try:
                     self.websocket_updated.emit(True)
                     async for message in self._websocket:

@@ -30,8 +30,7 @@ class SendImageKrita:
 
     def send_image_krita(self, images, prompt=None, extra_pnginfo=None):
         filename_prefix = "CKS_temp_" + ''.join(uuid.uuid4().hex)
-        full_output_folder, filename, counter, subfolder, filename_prefix = folder_paths.get_save_image_path(
-            filename_prefix, folder_paths.get_temp_directory(), images[0].shape[1], images[0].shape[0])
+        full_output_folder, filename, counter, subfolder, filename_prefix = folder_paths.get_save_image_path(filename_prefix, folder_paths.get_temp_directory(), images[0].shape[1], images[0].shape[0])
         results = []
         result_images = []
         for tensor in images:
