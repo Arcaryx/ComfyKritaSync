@@ -44,7 +44,7 @@ class SendImageKrita:
                 # Could put some kind of ID here, but for now just match them by index
                 {"source": "websocket", "content-type": "image/png", "type": "output"}
             )
-            return {"ui": {"images": results}}
+        return {"ui": {"images": results}}
 
 
 class GetImageKrita:
