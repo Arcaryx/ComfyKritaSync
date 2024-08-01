@@ -112,20 +112,13 @@ class KritaClient(QObject):
                                     pixel_data = target_layer.pixelData(0, 0, document.width(), document.height())
                                     q_image = QImage(pixel_data, document.width(), document.height(), QImage.Format.Format_ARGB32)
 
-                                    byte_array = QByteArray()
-                                    buffer = QBuffer(byte_array)
-                                    buffer.open(QBuffer.OpenModeFlag.WriteOnly)
-
-                                    writer = QImageWriter(buffer, QByteArray("png".encode("utf-8")))
-                                    writer.setQuality(100)
-
-                                    result = writer.write(q_image)
-                                    if not result:
-                                        raise Exception(f"Error writing layer {target_layer_string} to buffer")
-                                    buffer.close()
+                                    buffer = QBuffer()
+                                    buffer.open(QIODevice.WriteOnly)
+                                    q_image.save(buffer, "PNG")
+                                    byte_array = buffer.data()
 
                                     message = CksBinaryMessage()
-                                    message.add_payload('json', {"MessageType": str(MessageType.GetImageKrita)})
+                                    message.add_payload('json', json_payload)
                                     message.add_payload('png', io.BytesIO(byte_array).getvalue())  # TODO: Is this necessary?
 
                                     message_bytes = message.encode_message()

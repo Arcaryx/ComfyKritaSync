@@ -1,10 +1,11 @@
+import time
 import uuid
 import torch
 import os
 import json
 import folder_paths  # type: ignore
 import numpy as np
-from PIL import Image
+from PIL import Image, ImageFile
 from PIL.PngImagePlugin import PngInfo
 from server import PromptServer, BinaryEventTypes  # type: ignore
 from . import ws_krita
@@ -94,31 +95,36 @@ class GetImageKrita:
     def get_image_krita(self, document, layer):
         results = []
 
+        filename_prefix = "CKS_temp_" + ''.join(uuid.uuid4().hex)
+        full_output_folder, filename, counter, subfolder, filename_prefix = folder_paths.get_save_image_path(filename_prefix, folder_paths.get_temp_directory())
+        file = f"{filename}_.png"
+
         manager = ws_krita.KritaWsManager.instance()
         manager.send_sync(
             MessageType.GetImageKrita,
             {
                 "KritaDocument": document,  # TODO: This needs to contain the Krita document to target
-                "KritaLayer": layer
+                "KritaLayer": layer,
+                "FileNamePrefix": filename_prefix
             }
         )
 
-        # TODO: Get image from Krita websocket
-        image = Image.new("RGB", (1024, 1024), (255, 255, 255))
+        start_time = time.time()
+        filepath = os.path.join(full_output_folder, file)
+        timeout = 10
+        while not os.path.exists(filepath):
+            if time.time() - start_time > timeout:
+                raise FileNotFoundError(f'{filepath} not found after {timeout} seconds')
+            time.sleep(0.1)
+
+        image = Image.open(filepath)
         np_image = np.array(image).astype(np.float32) / 255.0
         torch_image = torch.from_numpy(np_image)[None,]
 
-        # Send to ComfyUI client (for preview)
-        server = PromptServer.instance
-        server.send_sync(
-            BinaryEventTypes.UNENCODED_PREVIEW_IMAGE,
-            ["PNG", image, None],
-            server.client_id
-        )
-
         # Results needed for preview in ComfyUI client
-        results.append(
-            # Could put some kind of ID here, but for now just match them by index
-            {"source": "websocket", "content-type": "image/png", "type": "output"}
-        )
+        results.append({
+            "filename": file,
+            "subfolder": subfolder,
+            "type": "temp"
+        })
         return torch_image, {"ui": {"images": results}}
