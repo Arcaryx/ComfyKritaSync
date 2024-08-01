@@ -1,6 +1,8 @@
 import json
 import base64
+from dataclasses import dataclass
 from enum import Enum, IntEnum
+from typing import List
 
 
 class PayloadType(IntEnum):
@@ -8,27 +10,104 @@ class PayloadType(IntEnum):
     PNG = 1
 
 
-class MessageType(Enum):
+class MessageType(IntEnum):
     SendImageKrita = 0
     GetImageKrita = 1
     DocumentSync = 2
 
 
-class CksBinaryMessage:
-    def __init__(self):
-        self.payloads = []
+def deserialize_ignore_missing_keys(cls, payload_dict: dict):
+    kwargs = {k: v for k, v in payload_dict.items() if k in cls.__annotations__.keys()}
+    return cls(**kwargs)
 
-    def add_payload(self, payload_type, content):
+
+@dataclass
+class CksJsonPayload:
+    type: MessageType
+
+    def serialize(self) -> str:
+        try:
+            result = json.dumps(self.__dict__)
+        except Exception as e:
+            print("Unable to serialize dict", e)
+            raise ValueError(f"Unable to serialize dict: {self.__dict__}")
+        return result
+
+    @classmethod
+    def deserialize(cls, payload_json: str) -> 'CksJsonPayload':
+        payload_dict = json.loads(payload_json)
+        payload_type = payload_dict.get('type', None)
+
+        if payload_type is None:
+            raise ValueError("Missing 'type' field in JSON payload.")
+
+        try:
+            payload_subclass = {
+                MessageType.SendImageKrita: SendImageKritaJsonPayload,
+                MessageType.GetImageKrita: GetImageKritaJsonPayload,
+                MessageType.DocumentSync: DocumentSyncJsonPayload,
+            }[payload_type]
+        except KeyError:
+            raise ValueError(f"Unsupported 'type' value: {payload_type}")
+
+        return payload_subclass.deserialize(payload_dict)
+
+
+@dataclass
+class SendImageKritaJsonPayload(CksJsonPayload):
+    krita_document: str
+    run_uuid: str
+
+    def __init__(self, krita_document: str, run_uuid: str):
+        super().__init__(MessageType.SendImageKrita)
+        self.krita_document = krita_document
+        self.run_uuid = run_uuid
+
+    @classmethod
+    def deserialize(cls, payload_dict: dict) -> 'SendImageKritaJsonPayload':
+        return deserialize_ignore_missing_keys(cls, payload_dict)
+
+
+class GetImageKritaJsonPayload(CksJsonPayload):
+    krita_document: str
+    krita_layer: str
+    filename_prefix: str
+
+    def __init__(self, krita_document: str, krita_layer: str, filename_prefix: str) -> None:
+        super().__init__(MessageType.GetImageKrita)
+        self.krita_document = krita_document
+        self.krita_layer = krita_layer
+        self.filename_prefix = filename_prefix
+
+    @classmethod
+    def deserialize(cls, payload_dict: dict) -> 'GetImageKritaJsonPayload':
+        return deserialize_ignore_missing_keys(cls, payload_dict)
+
+
+class DocumentSyncJsonPayload(CksJsonPayload):
+    temp: str
+
+    def __init__(self, temp: str):
+        super().__init__(MessageType.DocumentSync)
+        self.temp = temp
+
+    @classmethod
+    def deserialize(cls, payload_dict: dict) -> 'DocumentSyncJsonPayload':
+        return deserialize_ignore_missing_keys(cls, payload_dict)
+
+
+class CksBinaryMessage:
+    def __init__(self, json_payload: CksJsonPayload):
+        self.json_payload: CksJsonPayload = json_payload
+        self.payloads: [(PayloadType, bytes)] = []
+
+    def add_payload(self, payload_type: PayloadType, content: bytes):
         """
-        Adds a payload to the message. Supports 'json' and 'png'.
+        Adds a payload to the message. Supports PayloadType.PNG.
         """
-        if payload_type == 'json':
-            encoded_content = json.dumps(content).encode('utf-8')
-            self.payloads.append((PayloadType.JSON, encoded_content))
-        elif payload_type == 'png':
+        if payload_type == PayloadType.PNG:
             # content must be raw PNG bytes
-            encoded_content = base64.b64encode(content)
-            self.payloads.append((PayloadType.PNG, encoded_content))
+            self.payloads.append((PayloadType.PNG, content))
         else:
             raise ValueError("Unsupported payload type")
 
@@ -37,21 +116,36 @@ class CksBinaryMessage:
         Encodes the message to binary format.
         """
         message_parts = []
-        for payload_type, content in self.payloads:
-            header = f"{payload_type.name}:{len(content)},"
-            message_parts.append(header.encode('utf-8'))
-            message_parts.append(content)
 
+        # Always put the json payload first
+        dumped_json = self.json_payload.serialize()
+        encoded_json_content = dumped_json.encode('utf-8')
+
+        header = f"{PayloadType.JSON.name}:{len(encoded_json_content)},"
+        message_parts.append(header.encode('utf-8'))
+        message_parts.append(encoded_json_content)
+
+        for payload_type, content in self.payloads:
+            if payload_type == PayloadType.PNG:
+                encoded_content = base64.b64encode(content)
+            else:
+                raise ValueError("Unsupported payload type")
+
+            header = f"{payload_type.name}:{len(encoded_content)},"
+            message_parts.append(header.encode('utf-8'))
+            message_parts.append(encoded_content)
+
+        # TODO: I feel like this is needlessly copying the byte arrays more than necessary, could actually be a performance issue
         encoded_message = b''.join(message_parts)
         return encoded_message
 
     @classmethod
-    def decode_message(cls, binary_data):
+    def decode_message(cls, binary_data) -> 'CksBinaryMessage':
         """
         Decodes a binary message back to its original form.
         """
         idx = 0
-        decoded_message = cls()
+        decoded_message: CksBinaryMessage | None = None
 
         if isinstance(binary_data, (bytes, bytearray)):
             binary_data = memoryview(binary_data)
@@ -74,13 +168,23 @@ class CksBinaryMessage:
             content = binary_data[content_start:content_end].tobytes()
 
             if payload_type == PayloadType.JSON:
-                decoded_content = json.loads(content.decode('utf-8'))
+                if decoded_message is None:
+                    decoded_content = CksJsonPayload.deserialize(content.decode('utf-8'))
+                    decoded_message = cls(decoded_content)
+                else:
+                    raise ValueError("More than one JSON payload was present in the message")
             elif payload_type == PayloadType.PNG:
-                decoded_content = base64.b64decode(content)
+                if decoded_message is None:
+                    raise ValueError("No JSON payload present before image payloads")
+                else:
+                    decoded_content = base64.b64decode(content)
+                    decoded_message.payloads.append((payload_type, decoded_content))
             else:
                 raise ValueError(f"Unsupported payload type: {payload_type}")
 
-            decoded_message.payloads.append((payload_type, decoded_content))
             idx = content_end
+
+        if decoded_message is None:
+            raise ValueError("Unable to decode message from binary data")
 
         return decoded_message

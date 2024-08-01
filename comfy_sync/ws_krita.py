@@ -6,6 +6,7 @@ from io import BytesIO
 
 from server import BinaryEventTypes, PromptServer, send_socket_catch_exception  # type: ignore
 from ..krita_sync.cks_common import CksBinaryMessage
+from ..krita_sync.cks_common.CksBinaryMessage import CksJsonPayload, PayloadType
 
 
 def encode_bytes(event, data):
@@ -33,17 +34,14 @@ class KritaWsManager:
             cls._instance = KritaWsManager()
         return cls._instance
 
-    async def send(self, json_data, image_data=None, sid=None):
-        print(f"sending json_data: {json_data}")
-        cks_message = CksBinaryMessage()
-
-        cks_message.add_payload('json', json_data)
+    async def send(self, json_payload: CksJsonPayload, image_data=None, sid=None):
+        cks_message = CksBinaryMessage(json_payload)
 
         if image_data is not None:
             for image in image_data:
                 bytes_io = BytesIO()
                 image.save(bytes_io, format="PNG")
-                cks_message.add_payload('png', bytes_io.getvalue())
+                cks_message.add_payload(PayloadType.PNG, bytes_io.getvalue())
 
         cks_message_bytes = cks_message.encode_message()
 
@@ -54,14 +52,10 @@ class KritaWsManager:
         elif sid in self.sockets:
             await self.sockets[sid].send_bytes(cks_message_bytes)
 
-    def send_sync(self, message_type, json_data=None, image_data=None, sid=None):
-        if json_data is None:
-            json_data = {"MessageType": str(message_type)}
-        else:
-            json_data["MessageType"] = str(message_type)
+    def send_sync(self, json_payload: CksJsonPayload = None, image_data=None, sid=None):
         self.loop.call_soon_threadsafe(
             self.messages.put_nowait,
-            (json_data, image_data, sid)
+            (json_payload, image_data, sid)
         )
 
     async def publish_loop(self):

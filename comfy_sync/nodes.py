@@ -10,7 +10,7 @@ from PIL.PngImagePlugin import PngInfo
 from server import PromptServer, BinaryEventTypes  # type: ignore
 from . import ws_krita
 from comfy.cli_args import args  # type: ignore
-from ..krita_sync.cks_common.CksBinaryMessage import MessageType
+from ..krita_sync.cks_common.CksBinaryMessage import MessageType, GetImageKritaJsonPayload, SendImageKritaJsonPayload
 
 
 class SendImageKrita:
@@ -59,16 +59,11 @@ class SendImageKrita:
             counter += 1
 
         # Send to Krita client
-        # TODO: Should send all images once instead of sending images one at a time?
         manager = ws_krita.KritaWsManager.instance()
-        manager.send_sync(
-            MessageType.SendImageKrita,
-            {
-                "KritaDocument": "image.png",  # TODO: This needs to contain the Krita document to target
-                "RunUuid": "TODO"
-            },
-            result_images
-        )
+
+        # TODO: This needs to contain the Krita document to target
+        json_payload = SendImageKritaJsonPayload(krita_document="image.png", run_uuid="TODO")
+        manager.send_sync(json_payload, result_images)
 
         return {"ui": {"images": results}}
 
@@ -99,15 +94,10 @@ class GetImageKrita:
         full_output_folder, filename, counter, subfolder, filename_prefix = folder_paths.get_save_image_path(filename_prefix, folder_paths.get_temp_directory())
         file = f"{filename}_.png"
 
+        json_payload = GetImageKritaJsonPayload(krita_document=document, krita_layer=layer, filename_prefix=filename_prefix)
+
         manager = ws_krita.KritaWsManager.instance()
-        manager.send_sync(
-            MessageType.GetImageKrita,
-            {
-                "KritaDocument": document,  # TODO: This needs to contain the Krita document to target
-                "KritaLayer": layer,
-                "FileNamePrefix": filename_prefix
-            }
-        )
+        manager.send_sync(json_payload)
 
         start_time = time.time()
         filepath = os.path.join(full_output_folder, file)

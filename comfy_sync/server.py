@@ -3,11 +3,12 @@ import os
 import uuid
 import folder_paths  # type: ignore
 from PIL import Image
-from ..krita_sync.cks_common.CksBinaryMessage import MessageType
+from ..krita_sync.cks_common.CksBinaryMessage import MessageType, GetImageKritaJsonPayload
 from ..krita_sync.cks_common import CksBinaryMessage
 from server import PromptServer  # type: ignore
 from aiohttp import web, WSMsgType
 from . import ws_krita
+from typing import cast
 
 
 @PromptServer.instance.routes.get('/krita-sync-ws')
@@ -32,12 +33,13 @@ async def krita_websocket_handler(request):
             else:
                 decoded_message = CksBinaryMessage.decode_message(msg.data)
                 print(f"Total payloads: {len(decoded_message.payloads)}")
-                json_payload = decoded_message.payloads[0][1]
+                json_payload = decoded_message.json_payload
                 print(json_payload)
-                if json_payload["MessageType"] == str(MessageType.GetImageKrita):
-                    byte_array = decoded_message.payloads[1][1]
+                if json_payload.type == MessageType.GetImageKrita:
+                    get_image_krita_payload = cast(GetImageKritaJsonPayload, json_payload)
+                    (_, byte_array) = decoded_message.payloads[0]
                     image = Image.open(io.BytesIO(byte_array))
-                    filename_prefix = json_payload["FileNamePrefix"]
+                    filename_prefix = get_image_krita_payload.filename_prefix
                     full_output_folder, filename, counter, subfolder, filename_prefix = folder_paths.get_save_image_path(filename_prefix, folder_paths.get_temp_directory())
                     file = f"{filename}_s.png"
                     image.save(os.path.join(full_output_folder, file), compress_level=1)

@@ -1,20 +1,18 @@
 from __future__ import annotations
 
-import array
 import asyncio
 import io
 import os
-import time
 import uuid
-import json
 
 from PyQt5.QtCore import QThread, pyqtSignal, QObject, QByteArray, QBuffer, QIODevice
 from PyQt5.QtGui import QImage, QImageWriter
 from krita import Krita  # type: ignore
 
-from .cks_common.CksBinaryMessage import CksBinaryMessage, PayloadType, MessageType
+from .cks_common.CksBinaryMessage import CksBinaryMessage, PayloadType, MessageType, GetImageKritaJsonPayload
 from .websockets.src.websockets import client as ws_client
 import traceback
+from typing import cast
 
 
 def print_exception_trace(exception):
@@ -64,21 +62,22 @@ class KritaClient(QObject):
 
     def websocket_message_received_handler(self, decoded_message):
         print(f"Total payloads: {len(decoded_message.payloads)}")
-        json_payload = decoded_message.payloads[0][1]
+        json_payload = decoded_message.json_payload
         print(json_payload)
 
-        if json_payload["MessageType"] == str(MessageType.SendImageKrita):
+        if json_payload.type == MessageType.SendImageKrita:
             documents = Krita.instance().documents()
             if len(documents) > 0:
                 document = documents[0]
 
                 created_layer_index = 1
-                for payload in decoded_message.payloads[1:]:
+                for payload in decoded_message.payloads:
                     image = _extract_message_png_image(payload)
                     if image is not None:
                         self.create(document, f"test-{created_layer_index}", image)
                         created_layer_index += 1
-        elif json_payload["MessageType"] == str(MessageType.GetImageKrita):
+        elif json_payload.type == MessageType.GetImageKrita:
+            get_image_krita_payload = cast(GetImageKritaJsonPayload, json_payload)
             documents = Krita.instance().documents()
             for document in documents:
                 document_name = document.fileName()
@@ -87,8 +86,8 @@ class KritaClient(QObject):
                 else:
                     document_name = os.path.basename(document.fileName())
 
-                if json_payload["KritaDocument"] == document_name:
-                    target_layer_string = json_payload["KritaLayer"]
+                if get_image_krita_payload.krita_document == document_name:
+                    target_layer_string = get_image_krita_payload.krita_layer
                     target_layer = document.nodeByName(target_layer_string)
                     if target_layer is None:
                         raise Exception(f"Krita layer {target_layer_string} not found.")
@@ -101,9 +100,8 @@ class KritaClient(QObject):
                     q_image.save(buffer, "PNG")
                     byte_array = buffer.data()
 
-                    message = CksBinaryMessage()
-                    message.add_payload('json', json_payload)
-                    message.add_payload('png', io.BytesIO(byte_array).getvalue())  # TODO: Is this necessary?
+                    message = CksBinaryMessage(json_payload)
+                    message.add_payload(PayloadType.PNG, io.BytesIO(byte_array).getvalue())  # TODO: Is this necessary?
 
                     message_bytes = message.encode_message()
 
