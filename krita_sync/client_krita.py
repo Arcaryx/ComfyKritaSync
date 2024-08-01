@@ -41,6 +41,7 @@ def _extract_message_png_image(payload):
 
 class KritaClient(QObject):
     websocket_updated = pyqtSignal(bool)
+    websocket_message_received = pyqtSignal(CksBinaryMessage)
 
     def __init__(self):
         super().__init__()
@@ -51,6 +52,7 @@ class KritaClient(QObject):
         self._loop_thread = LoopThread(self._loop)
         self._loop_thread.start()
         self._id = str(uuid.uuid4())
+        self.websocket_message_received.connect(self.websocket_message_received_handler)
 
     _instance: KritaClient | None = None
 
@@ -59,6 +61,55 @@ class KritaClient(QObject):
         if cls._instance is None:
             cls._instance = KritaClient()
         return cls._instance
+
+    def websocket_message_received_handler(self, decoded_message):
+        print(f"Total payloads: {len(decoded_message.payloads)}")
+        json_payload = decoded_message.payloads[0][1]
+        print(json_payload)
+
+        if json_payload["MessageType"] == str(MessageType.SendImageKrita):
+            documents = Krita.instance().documents()
+            if len(documents) > 0:
+                document = documents[0]
+
+                created_layer_index = 1
+                for payload in decoded_message.payloads[1:]:
+                    image = _extract_message_png_image(payload)
+                    if image is not None:
+                        self.create(document, f"test-{created_layer_index}", image)
+                        created_layer_index += 1
+        elif json_payload["MessageType"] == str(MessageType.GetImageKrita):
+            documents = Krita.instance().documents()
+            for document in documents:
+                document_name = document.fileName()
+                if (document_name is None) or (document_name == ""):
+                    document_name = document.name()
+                else:
+                    document_name = os.path.basename(document.fileName())
+
+                if json_payload["KritaDocument"] == document_name:
+                    target_layer_string = json_payload["KritaLayer"]
+                    target_layer = document.nodeByName(target_layer_string)
+                    if target_layer is None:
+                        raise Exception(f"Krita layer {target_layer_string} not found.")
+                    # TODO: Make sure we can pull a group of layers properly
+                    pixel_data = target_layer.pixelData(0, 0, document.width(), document.height())
+                    q_image = QImage(pixel_data, document.width(), document.height(), QImage.Format.Format_ARGB32)
+
+                    buffer = QBuffer()
+                    buffer.open(QIODevice.WriteOnly)
+                    q_image.save(buffer, "PNG")
+                    byte_array = buffer.data()
+
+                    message = CksBinaryMessage()
+                    message.add_payload('json', json_payload)
+                    message.add_payload('png', io.BytesIO(byte_array).getvalue())  # TODO: Is this necessary?
+
+                    message_bytes = message.encode_message()
+
+                    self.run(self._websocket.send(message_bytes))
+
+                    break
 
     def create(self, doc: Krita.Document, name: str, img: QImage | None = None, ):
         node = doc.createNode(name, "paintlayer")
@@ -74,64 +125,22 @@ class KritaClient(QObject):
     # FIXME: We're not getting errors/logs at all when websockets fail to connect
     async def connect(self):
         try:
-            async for self._websocket in ws_client.connect(f"ws://127.0.0.1:8188/krita-sync-ws?clientId={self._id}&clientType=krita", max_size=2 ** 30, read_limit=2 ** 30, timeout=60, ping_timeout=60):
+            async for self._websocket in ws_client.connect(f"ws://127.0.0.1:8188/krita-sync-ws?clientId={self._id}&clientType=krita", max_size=2 ** 30, read_limit=2 ** 30):
                 try:
                     self.websocket_updated.emit(True)
                     async for message in self._websocket:
                         decoded_message = CksBinaryMessage.decode_message(message)
-                        print(f"Total payloads: {len(decoded_message.payloads)}")
-                        json_payload = decoded_message.payloads[0][1]
-                        print(json_payload)
-
-                        if json_payload["MessageType"] == str(MessageType.SendImageKrita):
-                            documents = Krita.instance().documents()
-                            if len(documents) > 0:
-                                document = documents[0]
-
-                                created_layer_index = 1
-                                for payload in decoded_message.payloads[1:]:
-                                    image = _extract_message_png_image(payload)
-                                    if image is not None:
-                                        self.create(document, f"test-{created_layer_index}", image)
-                                        created_layer_index += 1
-                        elif json_payload["MessageType"] == str(MessageType.GetImageKrita):
-                            documents = Krita.instance().documents()
-                            for document in documents:
-                                document_name = document.fileName()
-                                if (document_name is None) or (document_name == ""):
-                                    document_name = document.name()
-                                else:
-                                    document_name = os.path.basename(document.fileName())
-
-                                if json_payload["KritaDocument"] == document_name:
-                                    target_layer_string = json_payload["KritaLayer"]
-                                    target_layer = document.nodeByName(target_layer_string)
-                                    if target_layer is None:
-                                        raise Exception(f"Krita layer {target_layer_string} not found.")
-                                    # TODO: Make sure we can pull a group of layers properly
-                                    pixel_data = target_layer.pixelData(0, 0, document.width(), document.height())
-                                    q_image = QImage(pixel_data, document.width(), document.height(), QImage.Format.Format_ARGB32)
-
-                                    buffer = QBuffer()
-                                    buffer.open(QIODevice.WriteOnly)
-                                    q_image.save(buffer, "PNG")
-                                    byte_array = buffer.data()
-
-                                    message = CksBinaryMessage()
-                                    message.add_payload('json', json_payload)
-                                    message.add_payload('png', io.BytesIO(byte_array).getvalue())  # TODO: Is this necessary?
-
-                                    message_bytes = message.encode_message()
-
-                                    self.run(self._websocket.send(message_bytes))
-
-                                    break
-
+                        self.websocket_message_received.emit(decoded_message)
                 except Exception as e:
                     print_exception_trace(e)
                     print("Exception while processing ws messages, waiting 5 seconds before attempting to reconnect")
-                    time.sleep(5)
+                    self._websocket = None
+                    self.websocket_updated.emit(False)
+
+                    await asyncio.sleep(5)
+
                     continue
+
                 break
         except Exception as e:
             print("Exception while connecting to ws", e)
