@@ -50,6 +50,7 @@ async def krita_websocket_handler(request):
                     for item in document_sync_payload.document_map:
                         base_map[f"{item[1]} ({item[0].split('-')[0]})"] = (item[0], sid)
                     ws_krita.KritaWsManager.instance().documents = base_map
+                    PromptServer.instance.send_sync("cks_refresh", {})
 
     finally:
         ws_krita.KritaWsManager.instance().sockets.pop(sid, None)

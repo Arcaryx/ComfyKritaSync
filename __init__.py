@@ -8,5 +8,6 @@ NODE_DISPLAY_NAME_MAPPINGS = {
     "CKS_SendImageKrita": "Send Image to Krita",
     "CKS_GetImageKrita": "Get Image from Krita"
 }
+WEB_DIRECTORY = "./comfy_sync/js"
 
-__all__ = ["NODE_CLASS_MAPPINGS", "NODE_DISPLAY_NAME_MAPPINGS"]
+__all__ = ["NODE_CLASS_MAPPINGS", "NODE_DISPLAY_NAME_MAPPINGS", "WEB_DIRECTORY"]
