@@ -47,14 +47,20 @@ async def krita_websocket_handler(request):
                     os.rename(os.path.join(full_output_folder, file), os.path.join(full_output_folder, f"{filename}_.png"))  # >:(
                 elif json_payload.type == MessageType.DocumentSync:
                     document_sync_payload = cast(DocumentSyncJsonPayload, json_payload)
-                    base_map = {key: val for key, val in ws_krita.KritaWsManager.instance().documents.items() if val[1] == sid}
+                    base_map = {key: val for key, val in ws_krita.KritaWsManager.instance().documents.items() if val[1] != sid}
                     for item in document_sync_payload.document_map:
                         base_map[f"{item[1]} ({item[0].split('-')[0]})"] = (item[0], sid)
                     ws_krita.KritaWsManager.instance().documents = base_map
-                    PromptServer.instance.send_sync("cks_refresh", {})
                     ws_krita.KritaWsManager.instance().document_combo = list(ws_krita.KritaWsManager.instance().documents.keys())
                     nodes.GetImageKrita.update_return_types()
+                    PromptServer.instance.send_sync("cks_refresh", {})
 
     finally:
         ws_krita.KritaWsManager.instance().sockets.pop(sid, None)
+        base_map = {key: val for key, val in ws_krita.KritaWsManager.instance().documents.items() if val[1] != sid}
+        ws_krita.KritaWsManager.instance().documents = base_map
+        ws_krita.KritaWsManager.instance().document_combo = list(ws_krita.KritaWsManager.instance().documents.keys())
+        nodes.GetImageKrita.update_return_types()
+        PromptServer.instance.send_sync("cks_refresh", {})
+
     return ws
