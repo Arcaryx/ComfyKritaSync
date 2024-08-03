@@ -19,7 +19,7 @@ class SendImageKrita:
     @classmethod
     def INPUT_TYPES(s):
         return {"required": {
-            "document": (list(KritaWsManager.instance().documents.keys()),),
+            "document": (KritaWsManager.instance().document_combo,),
             "images": ("IMAGE",)
         },
             "hidden": {
@@ -79,11 +79,17 @@ class GetImageKrita:
     @classmethod
     def INPUT_TYPES(s):
         return {"required": {
-           "document": (list(KritaWsManager.instance().documents.keys()),),
-           "layer": ("STRING", {"default": "Background"}, {"multiline": False})
+            "document": (KritaWsManager.instance().document_combo,),
+            "layer": ("STRING", {"default": "Background"}, {"multiline": False})
         }}
 
-    RETURN_TYPES = ("IMAGE",)
+    RETURN_TYPES = "IMAGE", KritaWsManager.instance().document_combo
+
+    @classmethod
+    def update_return_types(cls):
+        cls.RETURN_TYPES = "IMAGE", KritaWsManager.instance().document_combo
+
+    RETURN_NAMES = ("image", "document")
     FUNCTION = "get_image_krita"
     OUTPUT_NODE = False
     CATEGORY = "cks"
@@ -122,5 +128,5 @@ class GetImageKrita:
             "ui": {
                 "images": results
             },
-            "result": (torch_image, )
+            "result": (torch_image, document)
         }

@@ -3,11 +3,12 @@ import os
 import uuid
 import folder_paths  # type: ignore
 from PIL import Image
+
 from ..krita_sync.cks_common.CksBinaryMessage import MessageType, GetImageKritaJsonPayload, DocumentSyncJsonPayload
 from ..krita_sync.cks_common import CksBinaryMessage
 from server import PromptServer  # type: ignore
 from aiohttp import web, WSMsgType
-from . import ws_krita
+from . import ws_krita, nodes
 from typing import cast
 
 
@@ -51,6 +52,8 @@ async def krita_websocket_handler(request):
                         base_map[f"{item[1]} ({item[0].split('-')[0]})"] = (item[0], sid)
                     ws_krita.KritaWsManager.instance().documents = base_map
                     PromptServer.instance.send_sync("cks_refresh", {})
+                    ws_krita.KritaWsManager.instance().document_combo = list(ws_krita.KritaWsManager.instance().documents.keys())
+                    nodes.GetImageKrita.update_return_types()
 
     finally:
         ws_krita.KritaWsManager.instance().sockets.pop(sid, None)

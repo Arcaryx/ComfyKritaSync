@@ -26,6 +26,7 @@ class KritaWsManager:
         self.loop = PromptServer.instance.loop
         self.publish_task = self.loop.create_task(self.publish_loop())
         self.documents = dict()
+        self.document_combo = []
 
     _instance: KritaWsManager | None = None
 
