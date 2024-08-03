@@ -85,11 +85,11 @@ class GetImageKritaJsonPayload(CksJsonPayload):
 
 
 class DocumentSyncJsonPayload(CksJsonPayload):
-    temp: str
+    document_map: [(str, str)]
 
-    def __init__(self, temp: str):
+    def __init__(self, document_map: [(str, str)]):
         super().__init__(MessageType.DocumentSync)
-        self.temp = temp
+        self.document_map = document_map
 
     @classmethod
     def deserialize(cls, payload_dict: dict) -> 'DocumentSyncJsonPayload':

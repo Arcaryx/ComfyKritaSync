@@ -10,6 +10,8 @@ from PIL.PngImagePlugin import PngInfo
 from server import PromptServer, BinaryEventTypes  # type: ignore
 from . import ws_krita
 from comfy.cli_args import args  # type: ignore
+
+from .ws_krita import KritaWsManager
 from ..krita_sync.cks_common.CksBinaryMessage import MessageType, GetImageKritaJsonPayload, SendImageKritaJsonPayload
 
 
@@ -17,6 +19,7 @@ class SendImageKrita:
     @classmethod
     def INPUT_TYPES(s):
         return {"required": {
+            "document": (list(KritaWsManager.instance().documents.keys()),),
             "images": ("IMAGE",)
         },
             "hidden": {
@@ -30,7 +33,7 @@ class SendImageKrita:
     OUTPUT_NODE = True
     CATEGORY = "cks"
 
-    def send_image_krita(self, images, prompt=None, extra_pnginfo=None):
+    def send_image_krita(self, document, images, prompt=None, extra_pnginfo=None):
         filename_prefix = "CKS_temp_" + ''.join(uuid.uuid4().hex)
         full_output_folder, filename, counter, subfolder, filename_prefix = folder_paths.get_save_image_path(filename_prefix, folder_paths.get_temp_directory(), images[0].shape[1], images[0].shape[0])
         results = []
@@ -62,8 +65,8 @@ class SendImageKrita:
         manager = ws_krita.KritaWsManager.instance()
 
         # TODO: This needs to contain the Krita document to target
-        json_payload = SendImageKritaJsonPayload(krita_document="image.png", run_uuid="TODO")
-        manager.send_sync(json_payload, result_images)
+        json_payload = SendImageKritaJsonPayload(krita_document=KritaWsManager.instance().documents[document][0], run_uuid="TODO")
+        manager.send_sync(json_payload, result_images, KritaWsManager.instance().documents[document][1])
 
         return {"ui": {"images": results}}
 
@@ -71,15 +74,9 @@ class SendImageKrita:
 class GetImageKrita:
     @classmethod
     def INPUT_TYPES(s):
-        # TODO: Get list of documents from Krita clients, this will need to be refreshed when new documents are opened
-        #documents = ["image1.png", "image2.png", "image3.png"]
-        #return {"required": {
-        #    "document": (documents,),
-        #    "layer": ("STRING", {"default": "example layer"}, {"multiline": False})
-        #}}
         return {"required": {
-           "document": ("STRING", {"default": "Unnamed"}, {"multiline": False}),
-           "layer": ("STRING", {"default": "example layer"}, {"multiline": False})
+           "document": (list(KritaWsManager.instance().documents.keys()),),
+           "layer": ("STRING", {"default": "Background"}, {"multiline": False})
         }}
 
     RETURN_TYPES = ("IMAGE",)
@@ -94,10 +91,10 @@ class GetImageKrita:
         full_output_folder, filename, counter, subfolder, filename_prefix = folder_paths.get_save_image_path(filename_prefix, folder_paths.get_temp_directory())
         file = f"{filename}_.png"
 
-        json_payload = GetImageKritaJsonPayload(krita_document=document, krita_layer=layer, filename_prefix=filename_prefix)
+        json_payload = GetImageKritaJsonPayload(krita_document=KritaWsManager.instance().documents[document][0], krita_layer=layer, filename_prefix=filename_prefix)
 
         manager = ws_krita.KritaWsManager.instance()
-        manager.send_sync(json_payload)
+        manager.send_sync(json_payload, None, KritaWsManager.instance().documents[document][1])
 
         start_time = time.time()
         filepath = os.path.join(full_output_folder, file)

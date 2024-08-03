@@ -3,7 +3,7 @@ import os
 import uuid
 import folder_paths  # type: ignore
 from PIL import Image
-from ..krita_sync.cks_common.CksBinaryMessage import MessageType, GetImageKritaJsonPayload
+from ..krita_sync.cks_common.CksBinaryMessage import MessageType, GetImageKritaJsonPayload, DocumentSyncJsonPayload
 from ..krita_sync.cks_common import CksBinaryMessage
 from server import PromptServer  # type: ignore
 from aiohttp import web, WSMsgType
@@ -44,6 +44,12 @@ async def krita_websocket_handler(request):
                     file = f"{filename}_s.png"
                     image.save(os.path.join(full_output_folder, file), compress_level=1)
                     os.rename(os.path.join(full_output_folder, file), os.path.join(full_output_folder, f"{filename}_.png"))  # >:(
+                elif json_payload.type == MessageType.DocumentSync:
+                    document_sync_payload = cast(DocumentSyncJsonPayload, json_payload)
+                    base_map = {key: val for key, val in ws_krita.KritaWsManager.instance().documents.items() if val[1] == sid}
+                    for item in document_sync_payload.document_map:
+                        base_map[f"{item[1]} ({item[0].split('-')[0]})"] = (item[0], sid)
+                    ws_krita.KritaWsManager.instance().documents = base_map
 
     finally:
         ws_krita.KritaWsManager.instance().sockets.pop(sid, None)

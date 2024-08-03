@@ -9,7 +9,7 @@ from PyQt5.QtCore import QThread, pyqtSignal, QObject, QByteArray, QBuffer, QIOD
 from PyQt5.QtGui import QImage, QImageWriter
 from krita import Krita  # type: ignore
 
-from .cks_common.CksBinaryMessage import CksBinaryMessage, PayloadType, MessageType, GetImageKritaJsonPayload
+from .cks_common.CksBinaryMessage import CksBinaryMessage, PayloadType, MessageType, GetImageKritaJsonPayload, DocumentSyncJsonPayload, SendImageKritaJsonPayload
 from .websockets.src.websockets import client as ws_client
 import traceback
 from typing import cast
@@ -37,6 +37,14 @@ def _extract_message_png_image(payload):
         return None
 
 
+def _get_document_name(document):
+    document_name = document.fileName()
+    if (document_name is None) or (document_name == ""):
+        return document.name()
+    else:
+        return os.path.basename(document.fileName())
+
+
 class KritaClient(QObject):
     websocket_updated = pyqtSignal(bool)
     websocket_message_received = pyqtSignal(CksBinaryMessage)
@@ -52,6 +60,14 @@ class KritaClient(QObject):
         self._id = str(uuid.uuid4())
         self.websocket_message_received.connect(self.websocket_message_received_handler)
 
+        notifier = Krita.instance().notifier()
+        notifier.setActive(True)
+        notifier.imageCreated.connect(self.documents_changed_handler)
+        notifier.imageClosed.connect(self.documents_changed_handler)
+        notifier.imageSaved.connect(self.documents_changed_handler)
+        self.websocket_updated.connect(self.websocket_updated_handler)
+        self.document_map = {}
+
     _instance: KritaClient | None = None
 
     @classmethod
@@ -60,33 +76,44 @@ class KritaClient(QObject):
             cls._instance = KritaClient()
         return cls._instance
 
+    def websocket_updated_handler(self, connected):
+        if connected:
+            self.documents_changed_handler(None)
+
+    def documents_changed_handler(self, _):
+        if self._websocket is not None:
+            documents = Krita.instance().documents()
+            self.document_map = [(document.rootNode().uniqueId().toString()[1:-1], _get_document_name(document)) for document in documents]
+
+            message = CksBinaryMessage(DocumentSyncJsonPayload(self.document_map))
+            message_bytes = message.encode_message()
+            self.run(self._websocket.send(message_bytes))
+
     def websocket_message_received_handler(self, decoded_message):
         print(f"Total payloads: {len(decoded_message.payloads)}")
         json_payload = decoded_message.json_payload
         print(json_payload)
 
         if json_payload.type == MessageType.SendImageKrita:
+            send_image_krita_payload = cast(SendImageKritaJsonPayload, json_payload)
             documents = Krita.instance().documents()
-            if len(documents) > 0:
-                document = documents[0]
+            for document in documents:
+                document_uuid = document.rootNode().uniqueId().toString()[1:-1]
 
-                created_layer_index = 1
-                for payload in decoded_message.payloads:
-                    image = _extract_message_png_image(payload)
-                    if image is not None:
-                        self.create(document, f"test-{created_layer_index}", image)
-                        created_layer_index += 1
+                if send_image_krita_payload.krita_document == document_uuid:
+                    created_layer_index = 1
+                    for payload in decoded_message.payloads:
+                        image = _extract_message_png_image(payload)
+                        if image is not None:
+                            self.create(document, f"test-{created_layer_index}", image)
+                            created_layer_index += 1
         elif json_payload.type == MessageType.GetImageKrita:
             get_image_krita_payload = cast(GetImageKritaJsonPayload, json_payload)
             documents = Krita.instance().documents()
             for document in documents:
-                document_name = document.fileName()
-                if (document_name is None) or (document_name == ""):
-                    document_name = document.name()
-                else:
-                    document_name = os.path.basename(document.fileName())
+                document_uuid = document.rootNode().uniqueId().toString()[1:-1]
 
-                if get_image_krita_payload.krita_document == document_name:
+                if get_image_krita_payload.krita_document == document_uuid:
                     target_layer_string = get_image_krita_payload.krita_layer
                     target_layer = document.nodeByName(target_layer_string)
                     if target_layer is None:

@@ -25,6 +25,7 @@ class KritaWsManager:
         self.messages = asyncio.Queue()
         self.loop = PromptServer.instance.loop
         self.publish_task = self.loop.create_task(self.publish_loop())
+        self.documents = dict()
 
     _instance: KritaWsManager | None = None
 
