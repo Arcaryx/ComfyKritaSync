@@ -4,6 +4,7 @@ import asyncio
 import io
 import os
 import uuid
+from enum import IntEnum
 
 from PyQt5.QtCore import QThread, pyqtSignal, QObject, QByteArray, QBuffer, QIODevice
 from PyQt5.QtGui import QImage, QImageWriter
@@ -17,6 +18,12 @@ from typing import cast
 
 def print_exception_trace(exception):
     traceback.print_exception(type(exception), exception, exception.__traceback__)
+
+
+class ConnectionState(IntEnum):
+    Disconnected = 0
+    Connected = 1
+    Connecting = 2
 
 
 class LoopThread(QThread):
@@ -46,7 +53,7 @@ def _get_document_name(document):
 
 
 class KritaClient(QObject):
-    websocket_updated = pyqtSignal(bool)
+    websocket_updated = pyqtSignal(ConnectionState)
     websocket_message_received = pyqtSignal(CksBinaryMessage)
 
     def __init__(self):
@@ -58,6 +65,8 @@ class KritaClient(QObject):
         self._loop_thread = LoopThread(self._loop)
         self._loop_thread.start()
         self._id = str(uuid.uuid4())
+        self._connection_state = ConnectionState.Disconnected
+        self.connection_coroutine = None
         self.websocket_message_received.connect(self.websocket_message_received_handler)
 
         notifier = Krita.instance().notifier()
@@ -148,11 +157,15 @@ class KritaClient(QObject):
             root.addChildNode(node, None)
 
     # FIXME: We're not getting errors/logs at all when websockets fail to connect
-    async def connect(self):
+    async def connect(self, url):
         try:
-            async for self._websocket in ws_client.connect(f"ws://127.0.0.1:8188/krita-sync-ws?clientId={self._id}&clientType=krita", max_size=2 ** 30, read_limit=2 ** 30):
+            url = url.replace("http", "ws", 1)
+            self._connection_state = ConnectionState.Connecting
+            self.websocket_updated.emit(self._connection_state)
+            async for self._websocket in ws_client.connect(f"{url}/krita-sync-ws?clientId={self._id}&clientType=krita", max_size=2 ** 30, read_limit=2 ** 30):
                 try:
-                    self.websocket_updated.emit(True)
+                    self._connection_state = ConnectionState.Connected
+                    self.websocket_updated.emit(self._connection_state)
                     async for message in self._websocket:
                         decoded_message = CksBinaryMessage.decode_message(message)
                         self.websocket_message_received.emit(decoded_message)
@@ -160,7 +173,8 @@ class KritaClient(QObject):
                     print_exception_trace(e)
                     print("Exception while processing ws messages, waiting 5 seconds before attempting to reconnect")
                     self._websocket = None
-                    self.websocket_updated.emit(False)
+                    self._connection_state = ConnectionState.Connecting
+                    self.websocket_updated.emit(self._connection_state)
 
                     await asyncio.sleep(5)
 
@@ -170,15 +184,23 @@ class KritaClient(QObject):
         except Exception as e:
             print("Exception while connecting to ws", e)
         self._websocket = None
-        self.websocket_updated.emit(False)
+        self._connection_state = ConnectionState.Disconnected
+        self.websocket_updated.emit(self._connection_state)
 
     async def disconnect(self):
         if self._websocket is not None:
             await self._websocket.close()
             self._websocket = None
 
-    def is_connected(self):
-        return self._websocket is not None
+    def get_connection_state(self):
+        return self._connection_state
+
+    def kill_connection_coroutine(self):
+        if self.connection_coroutine is not None:
+            self.connection_coroutine.cancel()
+            self.connection_coroutine = None
+            self._connection_state = ConnectionState.Disconnected
+            self.websocket_updated.emit(self._connection_state)
 
     def run(self, future):
         return asyncio.run_coroutine_threadsafe(future, self._loop)
