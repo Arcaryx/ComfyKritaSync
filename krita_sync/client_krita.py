@@ -119,7 +119,7 @@ class KritaClient(QObject):
                     if target_layer is None:
                         raise Exception(f"Krita layer {target_layer_string} not found.")
                     # TODO: Make sure we can pull a group of layers properly
-                    pixel_data = target_layer.pixelData(0, 0, document.width(), document.height())
+                    pixel_data = target_layer.projectionPixelData(0, 0, document.width(), document.height())
                     q_image = QImage(pixel_data, document.width(), document.height(), QImage.Format.Format_ARGB32)
 
                     buffer = QBuffer()
