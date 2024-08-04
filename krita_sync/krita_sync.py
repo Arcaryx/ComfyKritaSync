@@ -3,7 +3,7 @@ import uuid
 from krita import Krita, Extension, DockWidget, DockWidgetFactory, DockWidgetFactoryBase  # type: ignore
 from PyQt5.QtWidgets import *
 from PyQt5.QtCore import *
-from krita_sync.client_krita import KritaClient, ConnectionState
+from krita_sync.client_krita import KritaClient, ConnectionState, _get_document_name
 
 
 class ComfyKritaSyncExtension(Extension):
@@ -72,7 +72,12 @@ class ComfyKritaSyncDocker(DockWidget):
         self.websocket_updated(client.get_connection_state())
 
     def canvasChanged(self, canvas):
-        pass
+        if canvas is not None and canvas.view() is not None:
+            if (document := Krita.instance().activeDocument()) and document in Krita.instance().documents() and document.activeNode() is not None:
+                document_uuid = document.rootNode().uniqueId().toString()[1:-1]
+                document_uuid_short = document_uuid.split("-")[0]
+                document_name = _get_document_name(document)
+                self.label_document.setText(f"Current Document: {document_name} ({document_uuid_short})")
 
     @pyqtSlot()
     def toggle_connection(self):
