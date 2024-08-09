@@ -25,7 +25,6 @@ class ConnectionState(IntEnum):
     Connected = 1
     Connecting = 2
 
-
 class LoopThread(QThread):
     def __init__(self, loop):
         super().__init__()
@@ -55,6 +54,8 @@ def _get_document_name(document):
 class KritaClient(QObject):
     websocket_updated = pyqtSignal(ConnectionState)
     websocket_message_received = pyqtSignal(CksBinaryMessage)
+    image_added = pyqtSignal(str, str, list)
+    document_changed = pyqtSignal()
 
     def __init__(self):
         super().__init__()
@@ -76,6 +77,7 @@ class KritaClient(QObject):
         notifier.imageSaved.connect(self.documents_changed_handler)
         self.websocket_updated.connect(self.websocket_updated_handler)
         self.document_map = {}
+        self.image_map = {}  # DocumentId -> {RunId, QImages}
 
     _instance: KritaClient | None = None
 
@@ -106,19 +108,32 @@ class KritaClient(QObject):
         if json_payload.type == MessageType.SendImageKrita:
             send_image_krita_payload = cast(SendImageKritaJsonPayload, json_payload)
             documents = Krita.instance().documents()
-            for document in documents:
-                document_uuid = document.rootNode().uniqueId().toString()[1:-1]
+            document_ids = [document.rootNode().uniqueId().toString()[1:-1] for document in documents]
 
-                if send_image_krita_payload.krita_document == document_uuid:
-                    created_layer_index = 1
-                    for payload in decoded_message.payloads:
-                        image = _extract_message_png_image(payload)
-                        if image is not None:
-                            self.create(document, f"test-{created_layer_index}", image)
-                            created_layer_index += 1
+            if send_image_krita_payload.krita_document not in document_ids:
+                print(f"Krita document {send_image_krita_payload.krita_document} not found, skipping.")
+                return
+
+            images = []
+            for payload in decoded_message.payloads:
+                image = _extract_message_png_image(payload)
+                if image is None:
+                    raise Exception("Error extracting png image from payload.")
+
+                if send_image_krita_payload.krita_document in self.image_map:
+                    if send_image_krita_payload.run_uuid in self.image_map[send_image_krita_payload.krita_document]:
+                        self.image_map[send_image_krita_payload.krita_document][send_image_krita_payload.run_uuid].append(image)
+                    else:
+                        self.image_map[send_image_krita_payload.krita_document][send_image_krita_payload.run_uuid] = [image]
+                else:
+                    self.image_map[send_image_krita_payload.krita_document] = {send_image_krita_payload.run_uuid: [image]}
+                images.append(image)
+            self.image_added.emit(send_image_krita_payload.krita_document, send_image_krita_payload.run_uuid, images)
+
         elif json_payload.type == MessageType.GetImageKrita:
             get_image_krita_payload = cast(GetImageKritaJsonPayload, json_payload)
             documents = Krita.instance().documents()
+
             for document in documents:
                 document_uuid = document.rootNode().uniqueId().toString()[1:-1]
 

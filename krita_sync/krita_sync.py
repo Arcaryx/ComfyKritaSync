@@ -1,5 +1,6 @@
 import uuid
 
+from PyQt5.QtGui import QIcon, QPixmap
 from krita import Krita, Extension, DockWidget, DockWidgetFactory, DockWidgetFactoryBase  # type: ignore
 from PyQt5.QtWidgets import *
 from PyQt5.QtCore import *
@@ -26,8 +27,47 @@ class ComfyKritaSyncExtension(Extension):
         pass
 
 
-class ComfyKritaSyncDocker(DockWidget):
+class GenHistoryWidget(QListWidget):
+    def __init__(self, parent):
+        super().__init__(parent)
 
+        self.setLayout(QHBoxLayout())
+        self.setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Expanding)
+        self.setResizeMode(QListView.Adjust)
+        self.setHorizontalScrollBarPolicy(Qt.ScrollBarPolicy.ScrollBarAlwaysOff)
+        self.setFlow(QListView.LeftToRight)
+        self.setViewMode(QListWidget.IconMode)
+        self.setIconSize(QSize(96, 96))
+        self.setSelectionMode(QListWidget.SelectionMode.SingleSelection)
+        self.setFrameStyle(QListWidget.NoFrame)
+        self.setDragEnabled(False)
+
+        client = KritaClient.instance()
+        client.image_added.connect(self.image_added_handler)
+        client.document_changed.connect(self.document_changed_handler)
+
+    def add_run(self, run_uuid, images):
+        for image in images:
+            scaled = image.scaled(192, 192, Qt.AspectRatioMode.IgnoreAspectRatio, Qt.TransformationMode.SmoothTransformation)
+            self.addItem(QListWidgetItem(QIcon(QPixmap.fromImage(scaled)), None))
+
+    def document_changed_handler(self):
+        self.clear()
+        if (document := Krita.instance().activeDocument()) and document.rootNode() is None:
+            return
+        current_document_uuid = Krita.instance().activeDocument().rootNode().uniqueId().toString()[1:-1]
+        client = KritaClient.instance()
+        if current_document_uuid in client.image_map:
+            image_runs = client.image_map[current_document_uuid]
+            for key, value in image_runs.items():
+                self.add_run(key, value)
+
+    def image_added_handler(self, document_uuid, run_uuid, images):
+        if (document := Krita.instance().activeDocument()) and document.rootNode() is not None and document.rootNode().uniqueId().toString()[1:-1] == document_uuid:
+            self.add_run(run_uuid, images)
+
+
+class ComfyKritaSyncDocker(DockWidget):
     def __init__(self):
         super().__init__()
         self.uuid = uuid.uuid4().hex
@@ -59,12 +99,9 @@ class ComfyKritaSyncDocker(DockWidget):
         self.label_document = QLabel("Current Document: -")
         document_widget.layout().addWidget(self.label_document)
 
-        # Preview Box Widget
-        preview_widget = QWidget(main_widget)
-        main_widget.layout().addWidget(preview_widget)
-        preview_widget.setLayout(QHBoxLayout())
-        preview_widget.setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Expanding)
-        main_widget.layout().setStretchFactor(preview_widget, 1)
+        # History Widget
+        history_widget = GenHistoryWidget(main_widget)
+        main_widget.layout().addWidget(history_widget)
 
         # Websocket Setup
         client = KritaClient.instance()
@@ -78,6 +115,7 @@ class ComfyKritaSyncDocker(DockWidget):
                 document_uuid_short = document_uuid.split("-")[0]
                 document_name = _get_document_name(document)
                 self.label_document.setText(f"Current Document: {document_name} ({document_uuid_short})")
+                KritaClient.instance().document_changed.emit()
 
     @pyqtSlot()
     def toggle_connection(self):
