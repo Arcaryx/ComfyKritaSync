@@ -77,7 +77,8 @@ class KritaClient(QObject):
         notifier.imageSaved.connect(self.documents_changed_handler)
         self.websocket_updated.connect(self.websocket_updated_handler)
         self.document_map = {}
-        self.image_map = {}  # DocumentId -> {RunId, QImages}
+        self.run_map = {}  # DocumentId -> {RunId, ImageIds}
+        self.image_map = {}  # ImageId -> QImage
 
     _instance: KritaClient | None = None
 
@@ -119,15 +120,16 @@ class KritaClient(QObject):
                 image = _extract_message_png_image(payload)
                 if image is None:
                     raise Exception("Error extracting png image from payload.")
-
-                if send_image_krita_payload.krita_document in self.image_map:
-                    if send_image_krita_payload.run_uuid in self.image_map[send_image_krita_payload.krita_document]:
-                        self.image_map[send_image_krita_payload.krita_document][send_image_krita_payload.run_uuid].append(image)
+                image_uuid = str(uuid.uuid4())
+                self.image_map[image_uuid] = image
+                if send_image_krita_payload.krita_document in self.run_map:
+                    if send_image_krita_payload.run_uuid in self.run_map[send_image_krita_payload.krita_document]:
+                        self.run_map[send_image_krita_payload.krita_document][send_image_krita_payload.run_uuid].append(image_uuid)
                     else:
-                        self.image_map[send_image_krita_payload.krita_document][send_image_krita_payload.run_uuid] = [image]
+                        self.run_map[send_image_krita_payload.krita_document][send_image_krita_payload.run_uuid] = [image_uuid]
                 else:
-                    self.image_map[send_image_krita_payload.krita_document] = {send_image_krita_payload.run_uuid: [image]}
-                images.append(image)
+                    self.run_map[send_image_krita_payload.krita_document] = {send_image_krita_payload.run_uuid: [image_uuid]}
+                images.append(image_uuid)
             self.image_added.emit(send_image_krita_payload.krita_document, send_image_krita_payload.run_uuid, images)
 
         elif json_payload.type == MessageType.GetImageKrita:

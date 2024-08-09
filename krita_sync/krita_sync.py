@@ -45,11 +45,15 @@ class GenHistoryWidget(QListWidget):
         client = KritaClient.instance()
         client.image_added.connect(self.image_added_handler)
         client.document_changed.connect(self.document_changed_handler)
+        self.itemDoubleClicked.connect(self.item_double_clicked_handler)
 
     def add_run(self, run_uuid, images):
-        for image in images:
+        for image_uuid in images:
+            image = KritaClient.instance().image_map[image_uuid]
             scaled = image.scaled(192, 192, Qt.AspectRatioMode.IgnoreAspectRatio, Qt.TransformationMode.SmoothTransformation)
-            self.addItem(QListWidgetItem(QIcon(QPixmap.fromImage(scaled)), None))
+            item = QListWidgetItem(QIcon(QPixmap.fromImage(scaled)), None)
+            item.setData(Qt.ItemDataRole.UserRole, image_uuid)
+            self.addItem(item)
 
     def document_changed_handler(self):
         self.clear()
@@ -57,14 +61,22 @@ class GenHistoryWidget(QListWidget):
             return
         current_document_uuid = Krita.instance().activeDocument().rootNode().uniqueId().toString()[1:-1]
         client = KritaClient.instance()
-        if current_document_uuid in client.image_map:
-            image_runs = client.image_map[current_document_uuid]
+        if current_document_uuid in client.run_map:
+            image_runs = client.run_map[current_document_uuid]
             for key, value in image_runs.items():
                 self.add_run(key, value)
 
     def image_added_handler(self, document_uuid, run_uuid, images):
         if (document := Krita.instance().activeDocument()) and document.rootNode() is not None and document.rootNode().uniqueId().toString()[1:-1] == document_uuid:
             self.add_run(run_uuid, images)
+
+    def item_double_clicked_handler(self, item: QListWidgetItem):
+        image_uuid = item.data(Qt.ItemDataRole.UserRole)
+        client = KritaClient.instance()
+        image = client.image_map[image_uuid]
+        document = Krita.instance().activeDocument()
+        if document is not None and document.rootNode is not None:
+            client.create(document, image_uuid, image)
 
 
 class ComfyKritaSyncDocker(DockWidget):
