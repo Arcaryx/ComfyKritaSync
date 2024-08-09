@@ -1,6 +1,6 @@
 import uuid
 
-from PyQt5.QtGui import QIcon, QPixmap
+from PyQt5.QtGui import QIcon, QPixmap, QPainter, QColor
 from krita import Krita, Extension, DockWidget, DockWidgetFactory, DockWidgetFactoryBase  # type: ignore
 from PyQt5.QtWidgets import *
 from PyQt5.QtCore import *
@@ -31,13 +31,15 @@ class GenHistoryWidget(QListWidget):
     def __init__(self, parent):
         super().__init__(parent)
 
+        self.thumb_size = 150
+
         self.setLayout(QHBoxLayout())
         self.setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Expanding)
         self.setResizeMode(QListView.Adjust)
         self.setHorizontalScrollBarPolicy(Qt.ScrollBarPolicy.ScrollBarAlwaysOff)
         self.setFlow(QListView.LeftToRight)
         self.setViewMode(QListWidget.IconMode)
-        self.setIconSize(QSize(96, 96))
+        self.setIconSize(QSize(self.thumb_size, self.thumb_size))
         self.setSelectionMode(QListWidget.SelectionMode.SingleSelection)
         self.setFrameStyle(QListWidget.NoFrame)
         self.setDragEnabled(False)
@@ -50,8 +52,22 @@ class GenHistoryWidget(QListWidget):
     def add_run(self, run_uuid, images):
         for image_uuid in images:
             image = KritaClient.instance().image_map[image_uuid]
-            scaled = image.scaled(192, 192, Qt.AspectRatioMode.IgnoreAspectRatio, Qt.TransformationMode.SmoothTransformation)
-            item = QListWidgetItem(QIcon(QPixmap.fromImage(scaled)), None)
+
+            scaled_image = image.scaled(self.thumb_size, self.thumb_size, Qt.AspectRatioMode.KeepAspectRatio, Qt.TransformationMode.SmoothTransformation)
+
+            thumb_pixmap = QPixmap(self.thumb_size, self.thumb_size)
+            thumb_pixmap.fill(QColor(0, 0, 0, 0))
+
+            painter = QPainter(thumb_pixmap)
+            painter.setBackgroundMode(Qt.TransparentMode)
+
+            x = (thumb_pixmap.width() - scaled_image.width()) // 2
+            y = (thumb_pixmap.height() - scaled_image.height()) // 2
+            painter.drawImage(x, y, scaled_image)
+
+            painter.end()
+
+            item = QListWidgetItem(QIcon(thumb_pixmap), None)
             item.setData(Qt.ItemDataRole.UserRole, image_uuid)
             self.addItem(item)
 
