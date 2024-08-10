@@ -27,32 +27,42 @@ class ComfyKritaSyncExtension(Extension):
         pass
 
 
-class GenHistoryWidget(QListWidget):
+class GenHistoryWidget(QFrame):
     def __init__(self, parent):
         super().__init__(parent)
-
+        self.list_widgets = {}
         self.thumb_size = 150
 
-        self.setLayout(QHBoxLayout())
+        self.setLayout(QVBoxLayout())
         self.setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Expanding)
-        self.setResizeMode(QListView.Adjust)
-        self.setHorizontalScrollBarPolicy(Qt.ScrollBarPolicy.ScrollBarAlwaysOff)
-        self.setFlow(QListView.LeftToRight)
-        self.setViewMode(QListWidget.IconMode)
-        self.setIconSize(QSize(self.thumb_size, self.thumb_size))
-        self.setSelectionMode(QListWidget.SelectionMode.SingleSelection)
-        self.setFrameStyle(QListWidget.NoFrame)
-        self.setDragEnabled(False)
 
         client = KritaClient.instance()
         client.image_added.connect(self.image_added_handler)
         client.document_changed.connect(self.document_changed_handler)
-        self.itemDoubleClicked.connect(self.item_double_clicked_handler)
 
     def add_run(self, run_uuid, images):
+        if run_uuid not in self.list_widgets:
+            list_widget = QListWidget()
+            list_widget.setMinimumHeight(self.thumb_size + 2)
+            list_widget.setResizeMode(QListView.ResizeMode.Adjust)
+            # list_widget.setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Expanding)
+            list_widget.setVerticalScrollBarPolicy(Qt.ScrollBarPolicy.ScrollBarAlwaysOff)
+            list_widget.setHorizontalScrollBarPolicy(Qt.ScrollBarPolicy.ScrollBarAlwaysOff)
+            list_widget.setFlow(QListView.Flow.LeftToRight)
+            list_widget.setViewMode(QListWidget.ViewMode.IconMode)
+            list_widget.setIconSize(QSize(self.thumb_size, self.thumb_size))
+            list_widget.setSelectionMode(QListWidget.SelectionMode.SingleSelection)
+            list_widget.setFrameStyle(QListWidget.NoFrame)
+            list_widget.setDragEnabled(False)
+            list_widget.itemDoubleClicked.connect(self.item_double_clicked_handler)
+
+            list_widget.setStyleSheet("QListWidget { border: 2px solid #FF5733; }")
+
+            self.layout().addWidget(list_widget)
+            self.list_widgets[run_uuid] = list_widget
+
         for image_uuid in images:
             image = KritaClient.instance().image_map[image_uuid]
-
             scaled_image = image.scaled(self.thumb_size, self.thumb_size, Qt.AspectRatioMode.KeepAspectRatio, Qt.TransformationMode.SmoothTransformation)
 
             thumb_pixmap = QPixmap(self.thumb_size, self.thumb_size)
@@ -64,27 +74,33 @@ class GenHistoryWidget(QListWidget):
             x = (thumb_pixmap.width() - scaled_image.width()) // 2
             y = (thumb_pixmap.height() - scaled_image.height()) // 2
             painter.drawImage(x, y, scaled_image)
-
             painter.end()
 
             item = QListWidgetItem(QIcon(thumb_pixmap), None)
             item.setData(Qt.ItemDataRole.UserRole, image_uuid)
-            self.addItem(item)
+            self.list_widgets[run_uuid].addItem(item)
+
+    def image_added_handler(self, document_uuid, run_uuid, images):
+        if (document := Krita.instance().activeDocument()) and document.rootNode() is not None and document.rootNode().uniqueId().toString()[1:-1] == document_uuid:
+            self.add_run(run_uuid, images)
 
     def document_changed_handler(self):
-        self.clear()
+        while self.layout().count():
+            item = self.layout().takeAt(0)
+            if item.widget():
+                item.widget().deleteLater()
+
+        self.list_widgets.clear()
+
         if (document := Krita.instance().activeDocument()) and document.rootNode() is None:
             return
+
         current_document_uuid = Krita.instance().activeDocument().rootNode().uniqueId().toString()[1:-1]
         client = KritaClient.instance()
         if current_document_uuid in client.run_map:
             image_runs = client.run_map[current_document_uuid]
             for key, value in image_runs.items():
                 self.add_run(key, value)
-
-    def image_added_handler(self, document_uuid, run_uuid, images):
-        if (document := Krita.instance().activeDocument()) and document.rootNode() is not None and document.rootNode().uniqueId().toString()[1:-1] == document_uuid:
-            self.add_run(run_uuid, images)
 
     def item_double_clicked_handler(self, item: QListWidgetItem):
         image_uuid = item.data(Qt.ItemDataRole.UserRole)
@@ -93,7 +109,6 @@ class GenHistoryWidget(QListWidget):
         document = Krita.instance().activeDocument()
         if document is not None and document.rootNode is not None:
             client.create(document, image_uuid, image)
-
 
 class ComfyKritaSyncDocker(DockWidget):
     def __init__(self):
@@ -128,8 +143,12 @@ class ComfyKritaSyncDocker(DockWidget):
         document_widget.layout().addWidget(self.label_document)
 
         # History Widget
+        scroll_area = QScrollArea()
+        scroll_area.setWidgetResizable(True)
+
         history_widget = GenHistoryWidget(main_widget)
-        main_widget.layout().addWidget(history_widget)
+        scroll_area.setWidget(history_widget)
+        main_widget.layout().addWidget(scroll_area)
 
         # Websocket Setup
         client = KritaClient.instance()
