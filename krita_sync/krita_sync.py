@@ -3,7 +3,7 @@ import uuid
 from PyQt5.QtGui import QIcon, QPixmap, QPainter, QColor
 from krita import Krita, Extension, DockWidget, DockWidgetFactory, DockWidgetFactoryBase  # type: ignore
 from PyQt5.QtWidgets import *
-from PyQt5.QtCore import *
+from PyQt5.QtCore import Qt, QSize, pyqtSlot
 from krita_sync.client_krita import KritaClient, ConnectionState, _get_document_name
 
 
@@ -34,6 +34,7 @@ class GenHistoryWidget(QFrame):
         self.thumb_size = 150
 
         self.setLayout(QVBoxLayout())
+        self.layout().setAlignment(Qt.AlignTop)
         self.setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Expanding)
 
         client = KritaClient.instance()
@@ -45,7 +46,6 @@ class GenHistoryWidget(QFrame):
             list_widget = QListWidget()
             list_widget.setMinimumHeight(self.thumb_size + 2)
             list_widget.setResizeMode(QListView.ResizeMode.Adjust)
-            # list_widget.setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Expanding)
             list_widget.setVerticalScrollBarPolicy(Qt.ScrollBarPolicy.ScrollBarAlwaysOff)
             list_widget.setHorizontalScrollBarPolicy(Qt.ScrollBarPolicy.ScrollBarAlwaysOff)
             list_widget.setFlow(QListView.Flow.LeftToRight)
@@ -80,6 +80,9 @@ class GenHistoryWidget(QFrame):
             item.setData(Qt.ItemDataRole.UserRole, image_uuid)
             self.list_widgets[run_uuid].addItem(item)
 
+        QApplication.processEvents()  # TODO: Is there a lighter weight solution for updating the viewport of a list?
+        self.adjust_list_widget_height(self.list_widgets[run_uuid])
+
     def image_added_handler(self, document_uuid, run_uuid, images):
         if (document := Krita.instance().activeDocument()) and document.rootNode() is not None and document.rootNode().uniqueId().toString()[1:-1] == document_uuid:
             self.add_run(run_uuid, images)
@@ -109,6 +112,20 @@ class GenHistoryWidget(QFrame):
         document = Krita.instance().activeDocument()
         if document is not None and document.rootNode is not None:
             client.create(document, image_uuid, image)
+
+    def resizeEvent(self, event, **kwargs):
+        super().resizeEvent(event, **kwargs)
+        for list_widget in self.list_widgets.values():
+            self.adjust_list_widget_height(list_widget)
+
+    def adjust_list_widget_height(self, list_widget):
+        width = list_widget.viewport().width()
+        num_columns = width // (self.thumb_size + 5)
+        num_rows = (list_widget.count() + num_columns - 1) // num_columns
+        print(f"Running adjust_list_widget_height, Width: {width}, Rows: {num_rows}, Columns: {num_columns}")
+        margins = list_widget.contentsMargins()
+        list_widget.setFixedHeight(num_rows * (self.thumb_size + 5) + margins.top() + margins.bottom())
+
 
 class ComfyKritaSyncDocker(DockWidget):
     def __init__(self):
