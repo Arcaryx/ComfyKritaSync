@@ -5,7 +5,8 @@ import os
 import json
 import folder_paths  # type: ignore
 import numpy as np
-from PIL import Image, ImageFile
+import node_helpers  # type: ignore
+from PIL import Image, ImageFile, ImageSequence, ImageOps
 from PIL.PngImagePlugin import PngInfo
 from server import PromptServer, BinaryEventTypes  # type: ignore
 from . import ws_krita
@@ -83,13 +84,13 @@ class GetImageKrita:
             "layer": ("STRING", {"default": "Background"}, {"multiline": False})
         }}
 
-    RETURN_TYPES = "IMAGE", KritaWsManager.instance().document_combo
+    RETURN_TYPES = "IMAGE", "MASK", KritaWsManager.instance().document_combo
 
     @classmethod
     def update_return_types(cls):
-        cls.RETURN_TYPES = "IMAGE", KritaWsManager.instance().document_combo
+        cls.RETURN_TYPES = "IMAGE", "MASK", KritaWsManager.instance().document_combo
 
-    RETURN_NAMES = ("image", "document")
+    RETURN_NAMES = ("image", "mask", "document")
     FUNCTION = "get_image_krita"
     OUTPUT_NODE = False
     CATEGORY = "cks"
@@ -114,9 +115,44 @@ class GetImageKrita:
                 raise FileNotFoundError(f'{filepath} not found after {timeout} seconds')
             time.sleep(0.1)
 
-        image = Image.open(filepath)
-        np_image = np.array(image).astype(np.float32) / 255.0
-        torch_image = torch.from_numpy(np_image)[None,]
+        # Below is from ComfyUI LoadImage node
+        img = node_helpers.pillow(Image.open, filepath)
+
+        output_images = []
+        output_masks = []
+        w, h = None, None
+
+        excluded_formats = ['MPO']
+
+        for i in ImageSequence.Iterator(img):
+            i = node_helpers.pillow(ImageOps.exif_transpose, i)
+            if i.mode == 'I':
+                i = i.point(lambda i: i * (1 / 255))
+            image = i.convert("RGB")
+
+            if len(output_images) == 0:
+                w = image.size[0]
+                h = image.size[1]
+
+            if image.size[0] != w or image.size[1] != h:
+                continue
+
+            image = np.array(image).astype(np.float32) / 255.0
+            image = torch.from_numpy(image)[None,]
+            if 'A' in i.getbands():
+                mask = np.array(i.getchannel('A')).astype(np.float32) / 255.0
+                mask = 1. - torch.from_numpy(mask)
+            else:
+                mask = torch.zeros((64, 64), dtype=torch.float32, device="cpu")
+            output_images.append(image)
+            output_masks.append(mask.unsqueeze(0))
+
+        if len(output_images) > 1 and img.format not in excluded_formats:
+            output_image = torch.cat(output_images, dim=0)
+            output_mask = torch.cat(output_masks, dim=0)
+        else:
+            output_image = output_images[0]
+            output_mask = output_masks[0]
 
         # Results needed for preview in ComfyUI client
         results.append({
@@ -128,5 +164,5 @@ class GetImageKrita:
             "ui": {
                 "images": results
             },
-            "result": (torch_image, document)
+            "result": (output_image, output_mask, document)
         }
