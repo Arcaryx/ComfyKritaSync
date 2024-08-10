@@ -65,7 +65,7 @@ class SendImageKrita:
         manager = ws_krita.KritaWsManager.instance()
 
         # TODO: This needs to contain the Krita document to target
-        json_payload = SendImageKritaJsonPayload(krita_document=KritaWsManager.instance().documents[document][0], run_uuid=uuid.uuid4().hex)
+        json_payload = SendImageKritaJsonPayload(krita_document=KritaWsManager.instance().documents[document][0], run_uuid=PromptServer.instance.last_prompt_id)
         manager.send_sync(json_payload, result_images, KritaWsManager.instance().documents[document][1])
 
         return {
