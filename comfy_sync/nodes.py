@@ -65,9 +65,11 @@ class SendImageKrita:
         # Send to Krita client
         manager = ws_krita.KritaWsManager.instance()
 
-        # TODO: This needs to contain the Krita document to target
-        json_payload = SendImageKritaJsonPayload(krita_document=KritaWsManager.instance().documents[document][0], run_uuid=PromptServer.instance.last_prompt_id)
-        manager.send_sync(json_payload, result_images, KritaWsManager.instance().documents[document][1])
+        if document in KritaWsManager.instance().documents:
+            json_payload = SendImageKritaJsonPayload(krita_document=KritaWsManager.instance().documents[document][0], run_uuid=PromptServer.instance.last_prompt_id)
+            manager.send_sync(json_payload, result_images, KritaWsManager.instance().documents[document][1])
+        else:
+            print("SendImageKrita skipped because no matching document id.")
 
         return {
             "ui": {
@@ -81,7 +83,8 @@ class GetImageKrita:
     def INPUT_TYPES(s):
         return {"required": {
             "document": (KritaWsManager.instance().document_combo,),
-            "layer": ("STRING", {"default": "Background"}, {"multiline": False})
+            "layer": ("STRING", {"default": "Background"}, {"multiline": False}),
+            "cks_filename_uuid": ("STRING", {"default": ""})
         }}
 
     RETURN_TYPES = "IMAGE", "MASK", KritaWsManager.instance().document_combo
@@ -95,17 +98,20 @@ class GetImageKrita:
     OUTPUT_NODE = False
     CATEGORY = "cks"
 
-    def get_image_krita(self, document, layer):
+    def get_image_krita(self, document, layer, cks_filename_uuid):
         results = []
 
-        filename_prefix = "CKS_temp_" + ''.join(uuid.uuid4().hex)
+        filename_prefix = "CKS_temp_" + ''.join(cks_filename_uuid)
         full_output_folder, filename, counter, subfolder, filename_prefix = folder_paths.get_save_image_path(filename_prefix, folder_paths.get_temp_directory())
         file = f"{filename}_.png"
 
-        json_payload = GetImageKritaJsonPayload(krita_document=KritaWsManager.instance().documents[document][0], krita_layer=layer, filename_prefix=filename_prefix)
+        if document in KritaWsManager.instance().documents:  # TODO: PromptServer.add_on_prompt_handler for fixing update_return_types with provided string
+            json_payload = GetImageKritaJsonPayload(krita_document=KritaWsManager.instance().documents[document][0], krita_layer=layer, filename_prefix=filename_prefix)
 
-        manager = ws_krita.KritaWsManager.instance()
-        manager.send_sync(json_payload, None, KritaWsManager.instance().documents[document][1])
+            manager = ws_krita.KritaWsManager.instance()
+            manager.send_sync(json_payload, None, KritaWsManager.instance().documents[document][1])
+        else:
+            print("GetImageKrita request skipped because no matching document id.")
 
         start_time = time.time()
         filepath = os.path.join(full_output_folder, file)
