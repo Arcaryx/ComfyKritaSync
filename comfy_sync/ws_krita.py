@@ -5,6 +5,7 @@ import struct
 from io import BytesIO
 
 from server import BinaryEventTypes, PromptServer, send_socket_catch_exception  # type: ignore
+from . import nodes
 from ..krita_sync.cks_common import CksBinaryMessage
 from ..krita_sync.cks_common.CksBinaryMessage import CksJsonPayload, PayloadType
 
@@ -28,6 +29,8 @@ class KritaWsManager:
         self.documents = dict()
         self.document_combo = []
 
+        PromptServer.instance.add_on_prompt_handler(self.fix_document_combo)
+
     _instance: KritaWsManager | None = None
 
     @classmethod
@@ -35,6 +38,20 @@ class KritaWsManager:
         if cls._instance is None:
             cls._instance = KritaWsManager()
         return cls._instance
+
+    def fix_document_combo(self, json_data):
+        prompt = json_data["prompt"]
+        for v in prompt.values():
+            if "class_type" in v:
+                cls = v["class_type"]
+                if cls == "CKS_GetImageKrita" or cls == "CKS_SendImageKrita":
+                    inputs = v["inputs"]
+                    document_combo_item = inputs["document"]
+                    if document_combo_item not in self.document_combo:
+                        self.document_combo.append(document_combo_item)
+                        nodes.GetImageKrita.update_return_types()  # FIXME: Clear these after?
+
+        return json_data
 
     async def send(self, json_payload: CksJsonPayload, image_data=None, sid=None):
         cks_message = CksBinaryMessage(json_payload)

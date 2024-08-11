@@ -84,7 +84,7 @@ class GetImageKrita:
         return {"required": {
             "document": (KritaWsManager.instance().document_combo,),
             "layer": ("STRING", {"default": "Background"}),
-            "cks_filename_uuid": ("STRING", {"default": ""})
+            "cks_uuid": ("STRING", {"default": ""})
         }}
 
     RETURN_TYPES = "IMAGE", "MASK", KritaWsManager.instance().document_combo
@@ -98,14 +98,14 @@ class GetImageKrita:
     OUTPUT_NODE = False
     CATEGORY = "cks"
 
-    def get_image_krita(self, document, layer, cks_filename_uuid):
+    def get_image_krita(self, document, layer, cks_uuid):
         results = []
 
-        filename_prefix = "CKS_temp_" + ''.join(cks_filename_uuid)
+        filename_prefix = "CKS_temp_" + ''.join(cks_uuid)
         full_output_folder, filename, counter, subfolder, filename_prefix = folder_paths.get_save_image_path(filename_prefix, folder_paths.get_temp_directory())
         file = f"{filename}_.png"
 
-        if document in KritaWsManager.instance().documents:  # TODO: PromptServer.add_on_prompt_handler for fixing update_return_types with provided string
+        if document in KritaWsManager.instance().documents:
             json_payload = GetImageKritaJsonPayload(krita_document=KritaWsManager.instance().documents[document][0], krita_layer=layer, filename_prefix=filename_prefix)
 
             manager = ws_krita.KritaWsManager.instance()
