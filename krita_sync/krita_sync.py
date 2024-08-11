@@ -58,7 +58,7 @@ class GenHistoryWidget(QFrame):
 
             list_widget.setStyleSheet("QListWidget { border: 2px solid #475c7d; }")
 
-            self.layout().addWidget(list_widget)
+            self.layout().insertWidget(0, list_widget)
             self.list_widgets[run_uuid] = list_widget
 
         for image_uuid in images:
