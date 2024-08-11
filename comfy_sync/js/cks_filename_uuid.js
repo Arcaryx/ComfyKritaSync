@@ -1,14 +1,18 @@
 import { app } from "../../../scripts/app.js";
-import { api } from "../../../scripts/api.js";
+import { ComfyWidgets } from "../../../scripts/widgets.js";
 
 app.registerExtension({
     name: "cks.filename_uuid",
-    async setup() {
+    init() {
+        const stringMethod = ComfyWidgets["STRING"]
+        ComfyWidgets["STRING"] = function (node, inputName, inputData) {
+            const res = stringMethod.apply(this, arguments);
+                if(inputName === "cks_filename_uuid"){
+                    res.widget.type = "hidden";
+                    res.widget.computeSize = () => [0, -4];
+                }
 
-    },
-    async nodeCreated(node) {
-        if (node?.widgets.some(widget => widget.name === "cks_filename_uuid")) {
-            console.log("HELLO")
+            return res;
         }
-    }
+    },
 });

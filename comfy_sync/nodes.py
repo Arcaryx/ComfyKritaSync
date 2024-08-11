@@ -83,7 +83,7 @@ class GetImageKrita:
     def INPUT_TYPES(s):
         return {"required": {
             "document": (KritaWsManager.instance().document_combo,),
-            "layer": ("STRING", {"default": "Background"}, {"multiline": False}),
+            "layer": ("STRING", {"default": "Background"}),
             "cks_filename_uuid": ("STRING", {"default": ""})
         }}
 
