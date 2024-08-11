@@ -10,6 +10,9 @@ app.registerExtension({
                 if(inputName === "cks_filename_uuid"){
                     res.widget.type = "hidden";
                     res.widget.computeSize = () => [0, -4];
+                    res.widget.beforeQueued = () => {
+                        res.widget.value = crypto.randomUUID();
+                    }
                 }
 
             return res;
