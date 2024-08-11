@@ -7,6 +7,19 @@ from PyQt5.QtCore import Qt, QSize, pyqtSlot
 from krita_sync.client_krita import KritaClient, ConnectionState, _get_document_name
 
 
+def _docker_document(docker):
+    windows = Krita.instance().windows()
+    for window in windows:
+        dockers = window.dockers()
+        if docker in dockers:
+            break
+    if window.activeView() is None or window.activeView().document() is None:
+        return None, None
+    document = window.activeView().document()
+    document_uuid = document.rootNode().uniqueId().toString()[1:-1]
+    return document, document_uuid
+
+
 class ComfyKritaSyncExtension(Extension):
     def __init__(self, parent):
         super().__init__(parent)
@@ -28,10 +41,12 @@ class ComfyKritaSyncExtension(Extension):
 
 
 class GenHistoryWidget(QFrame):
-    def __init__(self, parent):
+    def __init__(self, parent, docker):
         super().__init__(parent)
         self.list_widgets = {}
         self.thumb_size = 150
+        self.uuid = str(uuid.uuid4())
+        self.docker = docker
 
         self.setLayout(QVBoxLayout())
         self.layout().setAlignment(Qt.AlignTop)
@@ -84,10 +99,18 @@ class GenHistoryWidget(QFrame):
         self.adjust_list_widget_height(self.list_widgets[run_uuid])
 
     def image_added_handler(self, document_uuid, run_uuid, images):
-        if (document := Krita.instance().activeDocument()) and document.rootNode() is not None and document.rootNode().uniqueId().toString()[1:-1] == document_uuid:
+        document, document_id = _docker_document(self.docker)
+        if document is None:
+            return
+
+        if document_id == document_uuid:
             self.add_run(run_uuid, images)
 
     def document_changed_handler(self):
+        document, document_id = _docker_document(self.docker)
+        if document is None:
+            return
+
         while self.layout().count():
             item = self.layout().takeAt(0)
             if item.widget():
@@ -95,21 +118,20 @@ class GenHistoryWidget(QFrame):
 
         self.list_widgets.clear()
 
-        if (document := Krita.instance().activeDocument()) and document.rootNode() is None:
-            return
-
-        current_document_uuid = Krita.instance().activeDocument().rootNode().uniqueId().toString()[1:-1]
         client = KritaClient.instance()
-        if current_document_uuid in client.run_map:
-            image_runs = client.run_map[current_document_uuid]
+        if document_id in client.run_map:
+            image_runs = client.run_map[document_id]
             for key, value in image_runs.items():
                 self.add_run(key, value)
 
     def item_double_clicked_handler(self, item: QListWidgetItem):
+        document, document_id = _docker_document(self.docker)
+        if document is None:
+            return
+
         image_uuid = item.data(Qt.ItemDataRole.UserRole)
         client = KritaClient.instance()
         image = client.image_map[image_uuid]
-        document = Krita.instance().activeDocument()
         if document is not None and document.rootNode is not None:
             client.create(document, image_uuid, image)
 
@@ -122,7 +144,6 @@ class GenHistoryWidget(QFrame):
         width = list_widget.viewport().width()
         num_columns = (width - 1) // (self.thumb_size + 6)
         num_rows = (list_widget.count() + num_columns - 1) // num_columns
-        print(f"Running adjust_list_widget_height, Width: {width}, Rows: {num_rows}, Columns: {num_columns}")
         list_widget.setFixedHeight(num_rows * (self.thumb_size + 5) + 4)
 
 
@@ -162,7 +183,7 @@ class ComfyKritaSyncDocker(DockWidget):
         scroll_area = QScrollArea()
         scroll_area.setWidgetResizable(True)
 
-        history_widget = GenHistoryWidget(main_widget)
+        history_widget = GenHistoryWidget(main_widget, self)
         scroll_area.setWidget(history_widget)
         main_widget.layout().addWidget(scroll_area)
 
@@ -173,8 +194,8 @@ class ComfyKritaSyncDocker(DockWidget):
 
     def canvasChanged(self, canvas):
         if canvas is not None and canvas.view() is not None:
-            if (document := Krita.instance().activeDocument()) and document in Krita.instance().documents() and document.activeNode() is not None:
-                document_uuid = document.rootNode().uniqueId().toString()[1:-1]
+            document, document_uuid = _docker_document(self)
+            if document is not None:
                 document_uuid_short = document_uuid.split("-")[0]
                 document_name = _get_document_name(document)
                 self.label_document.setText(f"Current Document: {document_name} ({document_uuid_short})")
