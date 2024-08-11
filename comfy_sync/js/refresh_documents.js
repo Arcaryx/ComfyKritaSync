@@ -25,7 +25,13 @@ app.registerExtension({
     name: "cks.refresh",
     async setup() {
         api.addEventListener("cks_refresh", async () => {
+            // Save history here [Untitled 1] [Undefined so save nothing]
+
+            // Call refresh [Untitled 1 -> Undefined] [Undefined -> Document 1]
             await app.refreshComboInNodes()
+
+            // Check if history needs to be restored [No available nodes] [Document 1 -> Untitled 1]
+
         })
     },
     async nodeCreated(node) {
