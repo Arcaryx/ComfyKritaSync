@@ -22,6 +22,8 @@ class SendImageKrita:
         return {"required": {
             "document": (KritaWsManager.instance().document_combo,),
             "images": ("IMAGE",)
+        },"optional": {
+            "layer": ("STRING", {"default": "Background"}),
         },
             "hidden": {
                 "prompt": "PROMPT",
@@ -34,7 +36,7 @@ class SendImageKrita:
     OUTPUT_NODE = True
     CATEGORY = "cks"
 
-    def send_image_krita(self, document, images, prompt=None, extra_pnginfo=None):
+    def send_image_krita(self, document, images, layer=None, prompt=None, extra_pnginfo=None):
         filename_prefix = "CKS_temp_" + ''.join(uuid.uuid4().hex)
         full_output_folder, filename, counter, subfolder, filename_prefix = folder_paths.get_save_image_path(filename_prefix, folder_paths.get_temp_directory(), images[0].shape[1], images[0].shape[0])
         results = []
@@ -66,7 +68,11 @@ class SendImageKrita:
         manager = ws_krita.KritaWsManager.instance()
 
         if document in KritaWsManager.instance().documents:
-            json_payload = SendImageKritaJsonPayload(krita_document=KritaWsManager.instance().documents[document][0], run_uuid=PromptServer.instance.last_prompt_id)
+            json_payload = SendImageKritaJsonPayload(
+                krita_document=KritaWsManager.instance().documents[document][0],
+                krita_layer=layer,
+                run_uuid=PromptServer.instance.last_prompt_id
+            )
             manager.send_sync(json_payload, result_images, KritaWsManager.instance().documents[document][1])
         else:
             print("SendImageKrita skipped because no matching document id.")

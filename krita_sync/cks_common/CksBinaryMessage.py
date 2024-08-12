@@ -56,11 +56,13 @@ class CksJsonPayload:
 @dataclass
 class SendImageKritaJsonPayload(CksJsonPayload):
     krita_document: str
+    krita_layer: str
     run_uuid: str
 
-    def __init__(self, krita_document: str, run_uuid: str):
+    def __init__(self, krita_document: str, krita_layer: str, run_uuid: str):
         super().__init__(MessageType.SendImageKrita)
         self.krita_document = krita_document
+        self.krita_layer = krita_layer
         self.run_uuid = run_uuid
 
     @classmethod

@@ -1,9 +1,12 @@
 import uuid
+from typing import cast
 
 from PyQt5.QtGui import QIcon, QPixmap, QPainter, QColor
 from krita import Krita, Extension, DockWidget, DockWidgetFactory, DockWidgetFactoryBase  # type: ignore
 from PyQt5.QtWidgets import *
 from PyQt5.QtCore import Qt, QSize, pyqtSlot
+
+from krita_sync.cks_common.CksBinaryMessage import SendImageKritaJsonPayload
 from krita_sync.client_krita import KritaClient, ConnectionState, _get_document_name
 
 
@@ -56,7 +59,7 @@ class GenHistoryWidget(QFrame):
         client.image_added.connect(self.image_added_handler)
         client.document_changed.connect(self.document_changed_handler)
 
-    def add_run(self, run_uuid, images):
+    def add_run(self, run_uuid, images_metadata):
         if run_uuid not in self.list_widgets:
             list_widget = QListWidget()
             list_widget.setMinimumHeight(self.thumb_size + 2)
@@ -76,8 +79,8 @@ class GenHistoryWidget(QFrame):
             self.layout().insertWidget(0, list_widget)
             self.list_widgets[run_uuid] = list_widget
 
-        for image_uuid in images:
-            image = KritaClient.instance().image_map[image_uuid]
+        for image_metadata in images_metadata:
+            image = KritaClient.instance().image_map[image_metadata["image_uuid"]]
             scaled_image = image.scaled(self.thumb_size, self.thumb_size, Qt.AspectRatioMode.KeepAspectRatio, Qt.TransformationMode.SmoothTransformation)
 
             thumb_pixmap = QPixmap(self.thumb_size, self.thumb_size)
@@ -92,19 +95,20 @@ class GenHistoryWidget(QFrame):
             painter.end()
 
             item = QListWidgetItem(QIcon(thumb_pixmap), None)
-            item.setData(Qt.ItemDataRole.UserRole, image_uuid)
+            item.setData(Qt.ItemDataRole.UserRole, image_metadata["image_uuid"])
+            item.setData(Qt.ItemDataRole.UserRole+1, image_metadata["krita_layer"])
             self.list_widgets[run_uuid].addItem(item)
 
         QApplication.processEvents()  # TODO: Is there a lighter weight solution for updating the viewport of a list?
         self.adjust_list_widget_height(self.list_widgets[run_uuid])
 
-    def image_added_handler(self, document_uuid, run_uuid, images):
+    def image_added_handler(self, document_uuid, run_uuid, images_metadata):
         document, document_id = _docker_document(self.docker)
         if document is None:
             return
 
         if document_id == document_uuid:
-            self.add_run(run_uuid, images)
+            self.add_run(run_uuid, images_metadata)
 
     def document_changed_handler(self):
         document, document_id = _docker_document(self.docker)
@@ -130,10 +134,11 @@ class GenHistoryWidget(QFrame):
             return
 
         image_uuid = item.data(Qt.ItemDataRole.UserRole)
+        layer_name = item.data(Qt.ItemDataRole.UserRole+1)
         client = KritaClient.instance()
         image = client.image_map[image_uuid]
         if document is not None and document.rootNode is not None:
-            client.create(document, image_uuid, image)
+            client.create(document, image_uuid, layer_name, image)
 
     def resizeEvent(self, event, **kwargs):
         super().resizeEvent(event, **kwargs)

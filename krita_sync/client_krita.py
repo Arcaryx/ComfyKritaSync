@@ -4,7 +4,9 @@ import asyncio
 import io
 import os
 import uuid
+from copy import copy
 from enum import IntEnum
+from tokenize import group
 
 from PyQt5.QtCore import QThread, pyqtSignal, QObject, QByteArray, QBuffer, QIODevice
 from PyQt5.QtGui import QImage, QImageWriter
@@ -115,22 +117,26 @@ class KritaClient(QObject):
                 print(f"Krita document {send_image_krita_payload.krita_document} not found, skipping.")
                 return
 
-            images = []
+            images_metadata = []
             for payload in decoded_message.payloads:
                 image = _extract_message_png_image(payload)
                 if image is None:
                     raise Exception("Error extracting png image from payload.")
                 image_uuid = str(uuid.uuid4())
+
+                image_metadata = copy(send_image_krita_payload.__dict__)
+                image_metadata["image_uuid"] = image_uuid
+
                 self.image_map[image_uuid] = image
                 if send_image_krita_payload.krita_document in self.run_map:
                     if send_image_krita_payload.run_uuid in self.run_map[send_image_krita_payload.krita_document]:
-                        self.run_map[send_image_krita_payload.krita_document][send_image_krita_payload.run_uuid].append(image_uuid)
+                        self.run_map[send_image_krita_payload.krita_document][send_image_krita_payload.run_uuid].append(image_metadata)
                     else:
-                        self.run_map[send_image_krita_payload.krita_document][send_image_krita_payload.run_uuid] = [image_uuid]
+                        self.run_map[send_image_krita_payload.krita_document][send_image_krita_payload.run_uuid] = [image_metadata]
                 else:
-                    self.run_map[send_image_krita_payload.krita_document] = {send_image_krita_payload.run_uuid: [image_uuid]}
-                images.append(image_uuid)
-            self.image_added.emit(send_image_krita_payload.krita_document, send_image_krita_payload.run_uuid, images)
+                    self.run_map[send_image_krita_payload.krita_document] = {send_image_krita_payload.run_uuid: [image_metadata]}
+                images_metadata.append(image_metadata)
+            self.image_added.emit(send_image_krita_payload.krita_document, send_image_krita_payload.run_uuid, images_metadata)
 
         elif json_payload.type == MessageType.GetImageKrita:
             get_image_krita_payload = cast(GetImageKritaJsonPayload, json_payload)
@@ -162,16 +168,41 @@ class KritaClient(QObject):
 
                     break
 
-    def create(self, doc: Krita.Document, name: str, img: QImage | None = None, ):
-        node = doc.createNode(name, "paintlayer")
-        if img:
-            converted_image = img.convertToFormat(QImage.Format.Format_ARGB32)
+    def getOrCreateGroupNode(self, doc: Krita.Document, parent_node, group_layer_name: str):
+        # find the first node in `childNodes()` that has the name `group_layer_name` and grouplayer type
+        group_node = None
+        for node in parent_node.childNodes():
+            if node.name() == group_layer_name and node.type() == "grouplayer":
+                print(f"Layer with name {group_layer_name} and type grouplayer found")
+                group_node = node
+                break
 
-            ptr = converted_image.constBits()
-            converted_image_bytes = QByteArray(ptr.asstring(converted_image.byteCount()))
-            node.setPixelData(converted_image_bytes, 0, 0, converted_image.width(), converted_image.height())
-            root = doc.rootNode()
-            root.addChildNode(node, None)
+        if group_node is None:
+            print(f"Layer with name {group_node} and type grouplayer not found, creating...")
+            group_node = doc.createNode(group_layer_name, "grouplayer")
+            parent_node.addChildNode(group_node, None)
+
+        return group_node
+
+    def create(self, doc: Krita.Document, image_uuid, layer_name: str, img: QImage | None = None, ):
+        if not img:
+            raise ValueError("img must not be None!")
+        layer_names = layer_name.split("/")
+        if len(layer_names) == 1:
+            new_layer_parent_node = doc.rootNode()
+            node = doc.createNode(layer_name, "paintlayer")
+        else:
+            new_layer_parent_node = doc.rootNode()
+            for i in range(len(layer_names)-1):
+                new_layer_parent_node = self.getOrCreateGroupNode(doc, new_layer_parent_node, layer_names[i])
+            node = doc.createNode(layer_names[-1], "paintlayer")
+
+        converted_image = img.convertToFormat(QImage.Format.Format_ARGB32)
+
+        ptr = converted_image.constBits()
+        converted_image_bytes = QByteArray(ptr.asstring(converted_image.byteCount()))
+        node.setPixelData(converted_image_bytes, 0, 0, converted_image.width(), converted_image.height())
+        new_layer_parent_node.addChildNode(node, None)
 
     # FIXME: We're not getting errors/logs at all when websockets fail to connect
     async def connect(self, url):
