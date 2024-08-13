@@ -48,7 +48,7 @@ async def krita_websocket_handler(request):
                 elif json_payload.type == MessageType.DocumentSync:
                     document_sync_payload = cast(DocumentSyncJsonPayload, json_payload)
                     base_map = {key: val for key, val in ws_krita.KritaWsManager.instance().documents.items() if val[1] != sid}
-                    for item in document_sync_payload.document_map:
+                    for item in document_sync_payload.document_list:
                         base_map[f"{item[1]} ({item[0].split('-')[0]})"] = (item[0], sid)
                     ws_krita.KritaWsManager.instance().documents = base_map
                     ws_krita.KritaWsManager.instance().document_combo = ["Missing Document"] + list(ws_krita.KritaWsManager.instance().documents.keys())

@@ -78,9 +78,9 @@ class KritaClient(QObject):
         notifier.imageClosed.connect(self.documents_changed_handler)
         notifier.imageSaved.connect(self.documents_changed_handler)
         self.websocket_updated.connect(self.websocket_updated_handler)
-        self.document_map = {}
-        self.run_map = {}  # DocumentId -> {RunId, ImageIds}
-        self.image_map = {}  # ImageId -> QImage
+        self.document_list = [] # Tuple(DocumentId, DocumentName)
+        self.run_map = {}       # DocumentId -> {RunId, ImageIds}
+        self.image_map = {}     # ImageId -> QImage
 
     _instance: KritaClient | None = None
 
@@ -97,9 +97,32 @@ class KritaClient(QObject):
     def documents_changed_handler(self, _):
         if self._websocket is not None:
             documents = Krita.instance().documents()
-            self.document_map = [(document.rootNode().uniqueId().toString()[1:-1], _get_document_name(document)) for document in documents]
 
-            message = CksBinaryMessage(DocumentSyncJsonPayload(self.document_map))
+            # Get old document IDs from self.document_list
+            old_document_ids = [doc_id for doc_id, _ in self.document_list]
+
+            self.document_list = [(document.rootNode().uniqueId().toString()[1:-1], _get_document_name(document)) for document in documents]
+
+            # Get new document IDs from self.document_list
+            new_document_ids = [doc_id for doc_id, _ in self.document_list]
+
+            # Get a list of any document IDs that are now missing from new_document_ids compared to old_document_ids
+            missing_document_ids = set(old_document_ids) - set(new_document_ids)
+
+            print(f"Missing document IDs: {missing_document_ids}")
+
+            # Get all image IDs for those documents from self.run_map and delete the images in self.image_map, as well as the runs from self.run_map
+            for missing_doc_id in missing_document_ids:
+                if missing_doc_id in self.run_map:
+                    # Get all image_ids for the document
+                    for run_id, images_metadata in self.run_map[missing_doc_id].items():
+                        for image_metadata in images_metadata:
+                            image_id = image_metadata["image_uuid"]
+                            if image_id in self.image_map:
+                                del self.image_map[image_id]
+                    del self.run_map[missing_doc_id]
+
+            message = CksBinaryMessage(DocumentSyncJsonPayload(self.document_list))
             message_bytes = message.encode_message()
             self.run(self._websocket.send(message_bytes))
 
