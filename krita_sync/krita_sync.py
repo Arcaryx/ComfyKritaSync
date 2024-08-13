@@ -52,6 +52,8 @@ class GenHistoryWidget(QFrame):
         self.docker = docker
         self.selected_item = None
 
+        self.preview_image_layer_name = "[PREVIEW]"
+
         self.setLayout(QVBoxLayout())
         self.layout().setAlignment(Qt.AlignTop)
         self.setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Expanding)
@@ -142,13 +144,41 @@ class GenHistoryWidget(QFrame):
         if document is not None and document.rootNode is not None:
             client.create(document, layer_name, image)
 
+    def show_item_preview(self, item: QListWidgetItem):
+        document, document_id = _docker_document(self.docker)
+        if document is None:
+            return
+
+        image_uuid = item.data(Qt.ItemDataRole.UserRole)
+        layer_name = item.data(Qt.ItemDataRole.UserRole+1)
+        layer_name_parts = layer_name.split("/")
+        if len(layer_name_parts) > 1:
+            layer_name_parts[-1] = self.preview_image_layer_name
+            layer_name = "/".join(layer_name_parts)
+        else:
+            layer_name = self.preview_image_layer_name
+        client = KritaClient.instance()
+        image = client.image_map[image_uuid]
+        if document is not None and document.rootNode is not None:
+            client.create(document, layer_name, image)
+
+    def remove_item_preview(self):
+        document, document_id = _docker_document(self.docker)
+        preview_node = document.nodeByName(self.preview_image_layer_name)
+        if preview_node is not None:
+            preview_node.remove()
+
     def current_item_changed_handler(self, current: QListWidgetItem):
+        # TODO: This needs to be here to prevent infinite recursion, but we also need it to not be here for deselection to work, problem for a future us :)
         if current is None:
             return
 
         if self.selected_item is not None and current.listWidget() != self.selected_item.listWidget():
             self.selected_item.listWidget().setCurrentItem(None)
+
         self.selected_item = current
+        self.remove_item_preview()
+        self.show_item_preview(self.selected_item)
 
     def resizeEvent(self, event, **kwargs):
         super().resizeEvent(event, **kwargs)
