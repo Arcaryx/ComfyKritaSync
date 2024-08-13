@@ -50,6 +50,7 @@ class GenHistoryWidget(QFrame):
         self.thumb_size = 150
         self.uuid = str(uuid.uuid4())
         self.docker = docker
+        self.selected_item = None
 
         self.setLayout(QVBoxLayout())
         self.layout().setAlignment(Qt.AlignTop)
@@ -72,7 +73,8 @@ class GenHistoryWidget(QFrame):
             list_widget.setSelectionMode(QListWidget.SelectionMode.SingleSelection)
             list_widget.setFrameStyle(QListWidget.NoFrame)
             list_widget.setDragEnabled(False)
-            list_widget.itemDoubleClicked.connect(self.item_double_clicked_handler)
+            list_widget.itemActivated.connect(self.item_activated_handler)
+            list_widget.currentItemChanged.connect(self.current_item_changed_handler)
 
             list_widget.setStyleSheet("QListWidget { border: 2px solid #475c7d; }")
 
@@ -128,7 +130,7 @@ class GenHistoryWidget(QFrame):
             for key, value in image_runs.items():
                 self.add_run(key, value)
 
-    def item_double_clicked_handler(self, item: QListWidgetItem):
+    def item_activated_handler(self, item: QListWidgetItem):
         document, document_id = _docker_document(self.docker)
         if document is None:
             return
@@ -139,6 +141,14 @@ class GenHistoryWidget(QFrame):
         image = client.image_map[image_uuid]
         if document is not None and document.rootNode is not None:
             client.create(document, layer_name, image)
+
+    def current_item_changed_handler(self, current: QListWidgetItem):
+        if current is None:
+            return
+
+        if self.selected_item is not None and current.listWidget() != self.selected_item.listWidget():
+            self.selected_item.listWidget().setCurrentItem(None)
+        self.selected_item = current
 
     def resizeEvent(self, event, **kwargs):
         super().resizeEvent(event, **kwargs)
