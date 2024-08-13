@@ -138,7 +138,7 @@ class GenHistoryWidget(QFrame):
         client = KritaClient.instance()
         image = client.image_map[image_uuid]
         if document is not None and document.rootNode is not None:
-            client.create(document, image_uuid, layer_name, image)
+            client.create(document, layer_name, image)
 
     def resizeEvent(self, event, **kwargs):
         super().resizeEvent(event, **kwargs)

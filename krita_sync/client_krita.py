@@ -184,7 +184,7 @@ class KritaClient(QObject):
 
         return group_node
 
-    def create(self, doc: Krita.Document, image_uuid, layer_name: str, img: QImage | None = None, ):
+    def create(self, doc: Krita.Document, layer_name: str, img: QImage | None = None, ):
         if not img:
             raise ValueError("img must not be None!")
         layer_names = layer_name.split("/")
