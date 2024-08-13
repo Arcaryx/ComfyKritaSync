@@ -21,9 +21,8 @@ class SendImageKrita:
     def INPUT_TYPES(s):
         return {"required": {
             "document": (KritaWsManager.instance().document_combo,),
+            "layer": ("STRING", {"default": "Generated"}),
             "images": ("IMAGE",)
-        },"optional": {
-            "layer": ("STRING", {"default": "Background"}),
         },
             "hidden": {
                 "prompt": "PROMPT",
@@ -36,7 +35,7 @@ class SendImageKrita:
     OUTPUT_NODE = True
     CATEGORY = "cks"
 
-    def send_image_krita(self, document, images, layer=None, prompt=None, extra_pnginfo=None):
+    def send_image_krita(self, document, layer, images, prompt=None, extra_pnginfo=None):
         if document == "Missing Document":
             raise Exception("Missing Document")
 
