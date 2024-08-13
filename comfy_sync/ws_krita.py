@@ -27,7 +27,7 @@ class KritaWsManager:
         self.loop = PromptServer.instance.loop
         self.publish_task = self.loop.create_task(self.publish_loop())
         self.documents = dict()
-        self.document_combo = []
+        self.document_combo = ["Missing Document"]
 
         PromptServer.instance.add_on_prompt_handler(self.fix_document_combo)
 

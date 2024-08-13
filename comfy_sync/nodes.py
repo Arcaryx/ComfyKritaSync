@@ -37,6 +37,9 @@ class SendImageKrita:
     CATEGORY = "cks"
 
     def send_image_krita(self, document, images, layer=None, prompt=None, extra_pnginfo=None):
+        if document == "Missing Document":
+            raise Exception("Missing Document")
+
         filename_prefix = "CKS_temp_" + ''.join(uuid.uuid4().hex)
         full_output_folder, filename, counter, subfolder, filename_prefix = folder_paths.get_save_image_path(filename_prefix, folder_paths.get_temp_directory(), images[0].shape[1], images[0].shape[0])
         results = []
@@ -105,6 +108,9 @@ class GetImageKrita:
     CATEGORY = "cks"
 
     def get_image_krita(self, document, layer, cks_uuid):
+        if document == "Missing Document":
+            raise Exception("Missing Document")
+
         results = []
 
         filename_prefix = "CKS_temp_" + ''.join(cks_uuid)

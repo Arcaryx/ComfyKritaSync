@@ -51,7 +51,7 @@ async def krita_websocket_handler(request):
                     for item in document_sync_payload.document_map:
                         base_map[f"{item[1]} ({item[0].split('-')[0]})"] = (item[0], sid)
                     ws_krita.KritaWsManager.instance().documents = base_map
-                    ws_krita.KritaWsManager.instance().document_combo = list(ws_krita.KritaWsManager.instance().documents.keys())
+                    ws_krita.KritaWsManager.instance().document_combo = ["Missing Document"] + list(ws_krita.KritaWsManager.instance().documents.keys())
                     nodes.GetImageKrita.update_return_types()
                     PromptServer.instance.send_sync("cks_refresh", {})
 
@@ -59,7 +59,7 @@ async def krita_websocket_handler(request):
         ws_krita.KritaWsManager.instance().sockets.pop(sid, None)
         base_map = {key: val for key, val in ws_krita.KritaWsManager.instance().documents.items() if val[1] != sid}
         ws_krita.KritaWsManager.instance().documents = base_map
-        ws_krita.KritaWsManager.instance().document_combo = list(ws_krita.KritaWsManager.instance().documents.keys())
+        ws_krita.KritaWsManager.instance().document_combo = ["Missing Document"] + list(ws_krita.KritaWsManager.instance().documents.keys())
         nodes.GetImageKrita.update_return_types()
         PromptServer.instance.send_sync("cks_refresh", {})
 
