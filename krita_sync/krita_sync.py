@@ -141,8 +141,7 @@ class GenHistoryWidget(QFrame):
 
         print("item_clicked_handler")
 
-        preview_node = document.nodeByName(self.preview_image_layer_name)
-        if self.selected_item == item and item.isSelected() and preview_node is not None:
+        if self.selected_item == item and item.isSelected():
             print("Deselecting")
             self.selected_item = None
             item.listWidget().setCurrentItem(None)
