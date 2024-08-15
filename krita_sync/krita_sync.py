@@ -101,6 +101,7 @@ class GenHistoryWidget(QFrame):
             item = QListWidgetItem(QIcon(thumb_pixmap), None)
             item.setData(Qt.ItemDataRole.UserRole, image_metadata["image_uuid"])
             item.setData(Qt.ItemDataRole.UserRole+1, image_metadata["krita_layer"])
+            item.setData(Qt.ItemDataRole.ToolTipRole, f"Target Layer: {image_metadata['krita_layer']}\nClick to toggle preview, double-click to apply.")
             self.list_widgets[run_uuid].addItem(item)
 
         QApplication.processEvents()  # TODO: Is there a lighter weight solution for updating the viewport of a list?
