@@ -1,10 +1,10 @@
 import uuid
 from typing import cast
 
-from PyQt5.QtGui import QIcon, QPixmap, QPainter, QColor
+from PyQt5.QtGui import QIcon, QPixmap, QPainter, QColor, QGuiApplication
 from krita import Krita, Extension, DockWidget, DockWidgetFactory, DockWidgetFactoryBase  # type: ignore
 from PyQt5.QtWidgets import *
-from PyQt5.QtCore import Qt, QSize, pyqtSlot
+from PyQt5.QtCore import Qt, QSize, pyqtSlot, QItemSelectionModel, QEvent
 
 from krita_sync.cks_common.CksBinaryMessage import SendImageKritaJsonPayload
 from krita_sync.client_krita import KritaClient, ConnectionState, _get_document_name
@@ -22,6 +22,35 @@ def _docker_document(docker):
     document_uuid = document.rootNode().uniqueId().toString()[1:-1]
     return document, document_uuid
 
+class MyListWidget(QListWidget):
+    def __init__(self, *args, **kwargs):
+        super(MyListWidget, self).__init__(*args, **kwargs)
+
+    def selection_behavior_flags(self):
+        if self.selectionBehavior == QAbstractItemView.SelectionBehavior.SelectRows:
+            return QItemSelectionModel.Rows
+        elif self.selectionBehavior == QAbstractItemView.SelectionBehavior.SelectColumns:
+            return QItemSelectionModel.Columns
+        else:
+            return QItemSelectionModel.NoUpdate
+
+    def selectionCommand(self, index, event, q_event=None, *args, **kwargs):
+        key_modifiers = Qt.NoModifier
+        if event:
+            if event.type() in [QEvent.MouseButtonDblClick, QEvent.MouseButtonPress, QEvent.MouseButtonRelease, QEvent.MouseMove, QEvent.KeyPress, QEvent.KeyRelease]:
+                key_modifiers = event.modifiers()
+            else:
+                key_modifiers = QGuiApplication.keyboardModifiers()
+
+        if self.selectionMode() == QAbstractItemView.SingleSelection:
+            if event and event.type() == QEvent.MouseButtonRelease:
+                return QItemSelectionModel.NoUpdate
+            if (key_modifiers & Qt.ControlModifier) and self.selectionModel().isSelected(index) and event.type() != QEvent.MouseMove:
+                return QItemSelectionModel.Deselect | self.selection_behavior_flags()
+            else:
+                return QItemSelectionModel.ClearAndSelect | self.selection_behavior_flags()
+
+        return super(MyListWidget, self).selectionCommand(index, event)
 
 class ComfyKritaSyncExtension(Extension):
     def __init__(self, parent):
@@ -65,7 +94,7 @@ class GenHistoryWidget(QFrame):
 
     def add_run(self, run_uuid, images_metadata):
         if run_uuid not in self.list_widgets:
-            list_widget = QListWidget()
+            list_widget = MyListWidget()
             list_widget.setMinimumHeight(self.thumb_size + 2)
             list_widget.setResizeMode(QListView.ResizeMode.Adjust)
             list_widget.setVerticalScrollBarPolicy(Qt.ScrollBarPolicy.ScrollBarAlwaysOff)
@@ -140,12 +169,14 @@ class GenHistoryWidget(QFrame):
         if document is None:
             return
 
-        if self.last_clicked_item == item and item.isSelected():
-            self.selected_item = None
-            self.last_clicked_item = None
-            item.listWidget().setCurrentItem(None)
-        else:
-            self.last_clicked_item = item
+        print("item_clicked_handler")
+
+        # if self.last_clicked_item == item and item.isSelected():
+        #     self.selected_item = None
+        #     self.last_clicked_item = None
+        #     item.listWidget().setCurrentItem(None)
+        # else:
+        #     self.last_clicked_item = item
 
     def item_activated_handler(self, item: QListWidgetItem):
         document, document_id = _docker_document(self.docker)
