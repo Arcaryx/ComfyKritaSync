@@ -23,7 +23,8 @@ def _docker_document(docker):
     return document, document_uuid
 
 class MyListWidget(QListWidget):
-    def __init__(self, *args, **kwargs):
+    def __init__(self, docker, *args, **kwargs):
+        self.docker = docker
         super(MyListWidget, self).__init__(*args, **kwargs)
 
     def selection_behavior_flags(self):
@@ -35,22 +36,36 @@ class MyListWidget(QListWidget):
             return QItemSelectionModel.NoUpdate
 
     def selectionCommand(self, index, event, q_event=None, *args, **kwargs):
-        key_modifiers = Qt.NoModifier
-        if event:
-            if event.type() in [QEvent.MouseButtonDblClick, QEvent.MouseButtonPress, QEvent.MouseButtonRelease, QEvent.MouseMove, QEvent.KeyPress, QEvent.KeyRelease]:
-                key_modifiers = event.modifiers()
-            else:
-                key_modifiers = QGuiApplication.keyboardModifiers()
-
         if self.selectionMode() == QAbstractItemView.SingleSelection:
             if event and event.type() == QEvent.MouseButtonRelease:
                 return QItemSelectionModel.NoUpdate
-            if (key_modifiers & Qt.ControlModifier) and self.selectionModel().isSelected(index) and event.type() != QEvent.MouseMove:
-                return QItemSelectionModel.Deselect | self.selection_behavior_flags()
-            else:
-                return QItemSelectionModel.ClearAndSelect | self.selection_behavior_flags()
+            return QItemSelectionModel.Clear | QItemSelectionModel.Toggle | self.selection_behavior_flags()
 
         return super(MyListWidget, self).selectionCommand(index, event)
+
+    # TODO: Did we get ahead of ourselves here - how does this work when we're dealing with multiple lists?
+    def selectionChanged(self, selected, deselected):
+        print("selection changed")
+        deselected_indexes = deselected.indexes()
+        if len(deselected_indexes) > 0:
+            deselected_index = deselected_indexes[0]
+            deselected_item = self.item(deselected_index.row())
+            # TODO: Need to be able to call this stuff from here somehow, etc;
+            # TODO: Also this should take in the item / the layer name so we can target a specific layer, eg: "[Preview] MyLayerName"
+            self.docker.remove_item_preview()
+
+        select_indexes = selected.indexes()
+        if len(select_indexes) > 0:
+            selected_index = select_indexes[0]
+            selected_item = self.item(selected_index.row())
+            # TODO: Need to be able to call this stuff from here somehow, etc;
+            self.docker.show_item_preview(self.docker.selected_item)
+
+            if self.docker.selected_item is not None and self != self.docker.selected_item.listWidget():
+                print("Clearing current item from other list")
+                self.docker.selected_item.listWidget().setCurrentItem(None)
+
+        super(MyListWidget, self).selectionChanged(selected, deselected)
 
 class ComfyKritaSyncExtension(Extension):
     def __init__(self, parent):
@@ -94,7 +109,7 @@ class GenHistoryWidget(QFrame):
 
     def add_run(self, run_uuid, images_metadata):
         if run_uuid not in self.list_widgets:
-            list_widget = MyListWidget()
+            list_widget = MyListWidget(self)
             list_widget.setMinimumHeight(self.thumb_size + 2)
             list_widget.setResizeMode(QListView.ResizeMode.Adjust)
             list_widget.setVerticalScrollBarPolicy(Qt.ScrollBarPolicy.ScrollBarAlwaysOff)
@@ -105,9 +120,8 @@ class GenHistoryWidget(QFrame):
             list_widget.setSelectionMode(QListWidget.SelectionMode.SingleSelection)
             list_widget.setFrameStyle(QListWidget.NoFrame)
             list_widget.setDragEnabled(False)
-            list_widget.itemClicked.connect(self.item_clicked_handler)
             list_widget.itemActivated.connect(self.item_activated_handler)
-            list_widget.currentItemChanged.connect(self.current_item_changed_handler)
+            # list_widget.currentItemChanged.connect(self.current_item_changed_handler)
 
             list_widget.setStyleSheet("QListWidget { border: 2px solid #475c7d; }")
 
@@ -163,20 +177,6 @@ class GenHistoryWidget(QFrame):
             image_runs = client.run_map[document_id]
             for key, value in image_runs.items():
                 self.add_run(key, value)
-
-    def item_clicked_handler(self, item: QListWidgetItem):
-        document, document_id = _docker_document(self.docker)
-        if document is None:
-            return
-
-        print("item_clicked_handler")
-
-        # if self.last_clicked_item == item and item.isSelected():
-        #     self.selected_item = None
-        #     self.last_clicked_item = None
-        #     item.listWidget().setCurrentItem(None)
-        # else:
-        #     self.last_clicked_item = item
 
     def item_activated_handler(self, item: QListWidgetItem):
         document, document_id = _docker_document(self.docker)
