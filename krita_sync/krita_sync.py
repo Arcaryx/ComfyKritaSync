@@ -51,6 +51,7 @@ class GenHistoryWidget(QFrame):
         self.uuid = str(uuid.uuid4())
         self.docker = docker
         self.selected_item = None
+        self.last_clicked_item = None
 
         self.preview_image_layer_name = "[PREVIEW]"
 
@@ -139,13 +140,12 @@ class GenHistoryWidget(QFrame):
         if document is None:
             return
 
-        print("item_clicked_handler")
-
-        if self.selected_item == item and item.isSelected():
-            print("Deselecting")
+        if self.last_clicked_item == item and item.isSelected():
             self.selected_item = None
+            self.last_clicked_item = None
             item.listWidget().setCurrentItem(None)
-            item.setSelected(False)
+        else:
+            self.last_clicked_item = item
 
     def item_activated_handler(self, item: QListWidgetItem):
         document, document_id = _docker_document(self.docker)
@@ -189,17 +189,14 @@ class GenHistoryWidget(QFrame):
         print("current_item_changed_handler")
         # TODO: This needs to be here to prevent infinite recursion, but we also need it to not be here for deselection to work, problem for a future us :)
         if current is None:
-            print("test1")
             if self.selected_item is not None and self.selected_item.listWidget() == previous.listWidget():
-                print("test2")
                 self.remove_item_preview()
             return
-        print("test3")
+
         old_selected_item = self.selected_item
         self.selected_item = current
 
         if old_selected_item is not None and current.listWidget() != old_selected_item.listWidget():
-            print("test4")
             old_selected_item.listWidget().setCurrentItem(None)
 
         self.remove_item_preview()
