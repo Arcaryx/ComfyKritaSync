@@ -141,6 +141,8 @@ class GenHistoryWidget(QFrame):
         layer_name = item.data(Qt.ItemDataRole.UserRole+1)
         client = KritaClient.instance()
         image = client.image_map[image_uuid]
+
+        self.remove_item_preview()
         if document is not None and document.rootNode is not None:
             client.create(document, layer_name, image)
 
