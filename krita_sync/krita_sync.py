@@ -75,6 +75,7 @@ class GenHistoryWidget(QFrame):
             list_widget.setSelectionMode(QListWidget.SelectionMode.SingleSelection)
             list_widget.setFrameStyle(QListWidget.NoFrame)
             list_widget.setDragEnabled(False)
+            list_widget.itemClicked.connect(self.item_clicked_handler)
             list_widget.itemActivated.connect(self.item_activated_handler)
             list_widget.currentItemChanged.connect(self.current_item_changed_handler)
 
@@ -133,6 +134,20 @@ class GenHistoryWidget(QFrame):
             for key, value in image_runs.items():
                 self.add_run(key, value)
 
+    def item_clicked_handler(self, item: QListWidgetItem):
+        document, document_id = _docker_document(self.docker)
+        if document is None:
+            return
+
+        print("item_clicked_handler")
+
+        preview_node = document.nodeByName(self.preview_image_layer_name)
+        if self.selected_item == item and item.isSelected() and preview_node is not None:
+            print("Deselecting")
+            self.selected_item = None
+            item.listWidget().setCurrentItem(None)
+            item.setSelected(False)
+
     def item_activated_handler(self, item: QListWidgetItem):
         document, document_id = _docker_document(self.docker)
         if document is None:
@@ -171,15 +186,23 @@ class GenHistoryWidget(QFrame):
         if preview_node is not None:
             preview_node.remove()
 
-    def current_item_changed_handler(self, current: QListWidgetItem):
+    def current_item_changed_handler(self, current: QListWidgetItem, previous: QListWidgetItem):
+        print("current_item_changed_handler")
         # TODO: This needs to be here to prevent infinite recursion, but we also need it to not be here for deselection to work, problem for a future us :)
         if current is None:
+            print("test1")
+            if self.selected_item is not None and self.selected_item.listWidget() == previous.listWidget():
+                print("test2")
+                self.remove_item_preview()
             return
-
-        if self.selected_item is not None and current.listWidget() != self.selected_item.listWidget():
-            self.selected_item.listWidget().setCurrentItem(None)
-
+        print("test3")
+        old_selected_item = self.selected_item
         self.selected_item = current
+
+        if old_selected_item is not None and current.listWidget() != old_selected_item.listWidget():
+            print("test4")
+            old_selected_item.listWidget().setCurrentItem(None)
+
         self.remove_item_preview()
         self.show_item_preview(self.selected_item)
 
