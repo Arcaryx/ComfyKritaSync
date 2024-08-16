@@ -42,6 +42,8 @@ class MyListWidget(QListWidget):
         return super(MyListWidget, self).selectionCommand(index, event)
 
     def selectionChanged(self, selected, deselected):
+        document, document_id = _docker_document(self.docker)
+
         deselected_indexes = deselected.indexes()
         if len(deselected_indexes) > 0:
             deselected_index = deselected_indexes[0]
@@ -56,10 +58,13 @@ class MyListWidget(QListWidget):
             self.docker.show_item_preview(selected_item)
 
             if self.docker.selected_item is not None and self != self.docker.selected_item.listWidget():
+                # TODO: See if we can just get the selection model from the list widget and set that to have no selection instead
                 self.docker.selected_item.listWidget().setCurrentItem(None)
             self.docker.selected_item = selected_item
+            self.docker.selected_item_uuid[document_id] = selected_item.data(Qt.ItemDataRole.UserRole)["image_uuid"]
         else:
             self.docker.selected_item = None
+            self.docker.selected_item_uuid[document_id] = None
 
         super(MyListWidget, self).selectionChanged(selected, deselected)
 
@@ -91,7 +96,8 @@ class GenHistoryWidget(QFrame):
         self.uuid = str(uuid.uuid4())
         self.docker = docker
         self.selected_item = None
-        self.last_clicked_item = None
+        # We're leaving this as a tiny memory leak, if it comes back to bite us than ¯\_(ツ)_/¯
+        self.selected_item_uuid = {}
 
         self.preview_image_layer_name = "[PREVIEW]"
 
@@ -103,7 +109,7 @@ class GenHistoryWidget(QFrame):
         client.image_added.connect(self.image_added_handler)
         client.document_changed.connect(self.document_changed_handler)
 
-    def add_run(self, run_uuid, images_metadata):
+    def add_run(self, document, document_id, run_uuid, images_metadata):
         if run_uuid not in self.list_widgets:
             list_widget = MyListWidget(self)
             list_widget.setMinimumHeight(self.thumb_size + 2)
@@ -143,6 +149,15 @@ class GenHistoryWidget(QFrame):
             item.setData(Qt.ItemDataRole.ToolTipRole, f"Target Layer: {image_metadata['krita_layer']}\nClick to toggle preview, double-click to apply.")
             self.list_widgets[run_uuid].addItem(item)
 
+            if document_id in self.selected_item_uuid and self.selected_item_uuid[document_id] == image_metadata["image_uuid"]:
+                print("Setting selected")
+                layer_name = self.get_item_preview_layer_name(item)
+
+                client = KritaClient.instance()
+                client.remove(document, layer_name)
+
+                item.setSelected(True)
+
         QApplication.processEvents()  # TODO: Is there a lighter weight solution for updating the viewport of a list?
         self.adjust_list_widget_height(self.list_widgets[run_uuid])
 
@@ -152,7 +167,7 @@ class GenHistoryWidget(QFrame):
             return
 
         if document_id == document_uuid:
-            self.add_run(run_uuid, images_metadata)
+            self.add_run(document, document_id, run_uuid, images_metadata)
 
     def document_changed_handler(self):
         document, document_id = _docker_document(self.docker)
@@ -164,13 +179,14 @@ class GenHistoryWidget(QFrame):
             if item.widget():
                 item.widget().deleteLater()
 
+        self.selected_item = None
         self.list_widgets.clear()
 
         client = KritaClient.instance()
         if document_id in client.run_map:
             image_runs = client.run_map[document_id]
             for key, value in image_runs.items():
-                self.add_run(key, value)
+                self.add_run(document, document_id, key, value)
 
     def item_activated_handler(self, item: QListWidgetItem):
         document, document_id = _docker_document(self.docker)
@@ -210,7 +226,7 @@ class GenHistoryWidget(QFrame):
         client = KritaClient.instance()
         image = client.image_map[image_uuid]
         if document is not None and document.rootNode is not None:
-            client.create(document, layer_name, image)
+            client.create(document, layer_name, image, preview=True)
 
     def remove_item_preview(self, item):
         document, document_id = _docker_document(self.docker)

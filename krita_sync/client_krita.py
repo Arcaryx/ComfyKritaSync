@@ -201,7 +201,7 @@ class KritaClient(QObject):
         else:
             return group_nodes[0]
 
-    def create(self, doc: Krita.Document, layer_name: str, img: QImage | None = None):
+    def create(self, doc: Krita.Document, layer_name: str, img: QImage | None = None, preview: bool=False):
         if not img:
             raise ValueError("img must not be None!")
         layer_names = layer_name.split("/")
@@ -213,6 +213,9 @@ class KritaClient(QObject):
             for i in range(len(layer_names)-1):
                 new_layer_parent_node = self.getOrCreateGroupNode(doc, new_layer_parent_node, layer_names[i])
             node = doc.createNode(layer_names[-1], "paintlayer")
+
+        if preview:
+            node.setLocked(True)
 
         converted_image = img.convertToFormat(QImage.Format.Format_ARGB32)
 
