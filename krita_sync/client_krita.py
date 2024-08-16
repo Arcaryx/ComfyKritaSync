@@ -192,22 +192,16 @@ class KritaClient(QObject):
                     break
 
     def getOrCreateGroupNode(self, doc: Krita.Document, parent_node, group_layer_name: str):
-        # find the first node in `childNodes()` that has the name `group_layer_name` and grouplayer type
-        group_node = None
-        for node in parent_node.childNodes():
-            if node.name() == group_layer_name and node.type() == "grouplayer":
-                print(f"Layer with name {group_layer_name} and type grouplayer found")
-                group_node = node
-                break
+        group_nodes = parent_node.findChildNodes(group_layer_name, False, False, "grouplayer", 0)
 
-        if group_node is None:
-            print(f"Layer with name {group_node} and type grouplayer not found, creating...")
+        if len(group_nodes) == 0:
             group_node = doc.createNode(group_layer_name, "grouplayer")
             parent_node.addChildNode(group_node, None)
+            return group_node
+        else:
+            return group_nodes[0]
 
-        return group_node
-
-    def create(self, doc: Krita.Document, layer_name: str, img: QImage | None = None, ):
+    def create(self, doc: Krita.Document, layer_name: str, img: QImage | None = None):
         if not img:
             raise ValueError("img must not be None!")
         layer_names = layer_name.split("/")
@@ -226,6 +220,28 @@ class KritaClient(QObject):
         converted_image_bytes = QByteArray(ptr.asstring(converted_image.byteCount()))
         node.setPixelData(converted_image_bytes, 0, 0, converted_image.width(), converted_image.height())
         new_layer_parent_node.addChildNode(node, None)
+
+    def remove(self, doc: Krita.Document, layer_name: str):
+        layer_names = layer_name.split("/")
+        if len(layer_names) == 1:
+            preview_node = doc.nodeByName(layer_name)
+            if preview_node is not None:
+                preview_node.remove()
+        else:
+            current_node = doc.rootNode()
+            for i in range(len(layer_names) - 1):
+                found_nodes = current_node.findChildNodes(layer_names[i], False, False, "grouplayer", 0)
+                if len(found_nodes) > 0:
+                    current_node = found_nodes[0]
+                else:
+                    print(f"Couldn't find layer {layer_names[i]} while searching for path {layer_name}")
+                    return
+            found_nodes = current_node.findChildNodes(layer_names[-1], False, False, "paintlayer", 0)
+            if len(found_nodes) > 0:
+                found_nodes[0].remove()
+            else:
+                print(f"Couldn't find layer {layer_names[-1]} while searching for path {layer_name}")
+
 
     # FIXME: We're not getting errors/logs at all when websockets fail to connect
     async def connect(self, url):

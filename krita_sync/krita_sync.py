@@ -1,12 +1,10 @@
 import uuid
-from typing import cast
 
-from PyQt5.QtGui import QIcon, QPixmap, QPainter, QColor, QGuiApplication
+from PyQt5.QtGui import QIcon, QPixmap, QPainter, QColor
 from krita import Krita, Extension, DockWidget, DockWidgetFactory, DockWidgetFactoryBase  # type: ignore
 from PyQt5.QtWidgets import *
 from PyQt5.QtCore import Qt, QSize, pyqtSlot, QItemSelectionModel, QEvent
 
-from krita_sync.cks_common.CksBinaryMessage import SendImageKritaJsonPayload
 from krita_sync.client_krita import KritaClient, ConnectionState, _get_document_name
 
 
@@ -43,27 +41,23 @@ class MyListWidget(QListWidget):
 
         return super(MyListWidget, self).selectionCommand(index, event)
 
-    # TODO: Did we get ahead of ourselves here - how does this work when we're dealing with multiple lists?
     def selectionChanged(self, selected, deselected):
-        print("selection changed")
         deselected_indexes = deselected.indexes()
         if len(deselected_indexes) > 0:
             deselected_index = deselected_indexes[0]
             deselected_item = self.item(deselected_index.row())
-            # TODO: Need to be able to call this stuff from here somehow, etc;
-            # TODO: Also this should take in the item / the layer name so we can target a specific layer, eg: "[Preview] MyLayerName"
-            self.docker.remove_item_preview()
+            self.docker.remove_item_preview(deselected_item)
 
         select_indexes = selected.indexes()
         if len(select_indexes) > 0:
             selected_index = select_indexes[0]
             selected_item = self.item(selected_index.row())
-            # TODO: Need to be able to call this stuff from here somehow, etc;
-            self.docker.show_item_preview(self.docker.selected_item)
+
+            self.docker.show_item_preview(selected_item)
 
             if self.docker.selected_item is not None and self != self.docker.selected_item.listWidget():
-                print("Clearing current item from other list")
                 self.docker.selected_item.listWidget().setCurrentItem(None)
+            self.docker.selected_item = selected_item
 
         super(MyListWidget, self).selectionChanged(selected, deselected)
 
@@ -121,7 +115,6 @@ class GenHistoryWidget(QFrame):
             list_widget.setFrameStyle(QListWidget.NoFrame)
             list_widget.setDragEnabled(False)
             list_widget.itemActivated.connect(self.item_activated_handler)
-            # list_widget.currentItemChanged.connect(self.current_item_changed_handler)
 
             list_widget.setStyleSheet("QListWidget { border: 2px solid #475c7d; }")
 
@@ -144,8 +137,7 @@ class GenHistoryWidget(QFrame):
             painter.end()
 
             item = QListWidgetItem(QIcon(thumb_pixmap), None)
-            item.setData(Qt.ItemDataRole.UserRole, image_metadata["image_uuid"])
-            item.setData(Qt.ItemDataRole.UserRole+1, image_metadata["krita_layer"])
+            item.setData(Qt.ItemDataRole.UserRole, image_metadata)
             item.setData(Qt.ItemDataRole.ToolTipRole, f"Target Layer: {image_metadata['krita_layer']}\nClick to toggle preview, double-click to apply.")
             self.list_widgets[run_uuid].addItem(item)
 
@@ -183,55 +175,50 @@ class GenHistoryWidget(QFrame):
         if document is None:
             return
 
-        image_uuid = item.data(Qt.ItemDataRole.UserRole)
-        layer_name = item.data(Qt.ItemDataRole.UserRole+1)
+        image_metadata = item.data(Qt.ItemDataRole.UserRole)
+        image_uuid = image_metadata["image_uuid"]
+        layer_name = image_metadata["krita_layer"]
         client = KritaClient.instance()
         image = client.image_map[image_uuid]
 
-        self.remove_item_preview()
+        self.remove_item_preview(item)
         if document is not None and document.rootNode is not None:
             client.create(document, layer_name, image)
+
+    def get_item_preview_layer_name(self, item):
+        image_metadata = item.data(Qt.ItemDataRole.UserRole)
+        layer_name = image_metadata["krita_layer"]
+        layer_name_parts = layer_name.split("/")
+        if len(layer_name_parts) > 1:
+            layer_name_parts[-1] = f"{self.preview_image_layer_name} {layer_name_parts[-1]}"
+            layer_name = "/".join(layer_name_parts)
+        else:
+            layer_name = f"{self.preview_image_layer_name} {layer_name}"
+        return layer_name
 
     def show_item_preview(self, item: QListWidgetItem):
         document, document_id = _docker_document(self.docker)
         if document is None:
             return
 
-        image_uuid = item.data(Qt.ItemDataRole.UserRole)
-        layer_name = item.data(Qt.ItemDataRole.UserRole+1)
-        layer_name_parts = layer_name.split("/")
-        if len(layer_name_parts) > 1:
-            layer_name_parts[-1] = self.preview_image_layer_name
-            layer_name = "/".join(layer_name_parts)
-        else:
-            layer_name = self.preview_image_layer_name
+        image_metadata = item.data(Qt.ItemDataRole.UserRole)
+        image_uuid = image_metadata["image_uuid"]
+        layer_name = self.get_item_preview_layer_name(item)
+
         client = KritaClient.instance()
         image = client.image_map[image_uuid]
         if document is not None and document.rootNode is not None:
             client.create(document, layer_name, image)
 
-    def remove_item_preview(self):
+    def remove_item_preview(self, item):
         document, document_id = _docker_document(self.docker)
-        preview_node = document.nodeByName(self.preview_image_layer_name)
-        if preview_node is not None:
-            preview_node.remove()
-
-    def current_item_changed_handler(self, current: QListWidgetItem, previous: QListWidgetItem):
-        print("current_item_changed_handler")
-        # TODO: This needs to be here to prevent infinite recursion, but we also need it to not be here for deselection to work, problem for a future us :)
-        if current is None:
-            if self.selected_item is not None and self.selected_item.listWidget() == previous.listWidget():
-                self.remove_item_preview()
+        if document is None:
             return
 
-        old_selected_item = self.selected_item
-        self.selected_item = current
+        layer_name = self.get_item_preview_layer_name(item)
 
-        if old_selected_item is not None and current.listWidget() != old_selected_item.listWidget():
-            old_selected_item.listWidget().setCurrentItem(None)
-
-        self.remove_item_preview()
-        self.show_item_preview(self.selected_item)
+        client = KritaClient.instance()
+        client.remove(document, layer_name)
 
     def resizeEvent(self, event, **kwargs):
         super().resizeEvent(event, **kwargs)
