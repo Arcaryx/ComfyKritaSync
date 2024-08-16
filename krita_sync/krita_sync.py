@@ -58,6 +58,8 @@ class MyListWidget(QListWidget):
             if self.docker.selected_item is not None and self != self.docker.selected_item.listWidget():
                 self.docker.selected_item.listWidget().setCurrentItem(None)
             self.docker.selected_item = selected_item
+        else:
+            self.docker.selected_item = None
 
         super(MyListWidget, self).selectionChanged(selected, deselected)
 
