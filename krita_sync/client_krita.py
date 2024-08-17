@@ -57,7 +57,7 @@ class KritaClient(QObject):
     websocket_updated = pyqtSignal(ConnectionState)
     websocket_message_received = pyqtSignal(CksBinaryMessage)
     image_added = pyqtSignal(str, str, list)
-    document_changed = pyqtSignal()
+    document_changed = pyqtSignal(str)
 
     def __init__(self):
         super().__init__()

@@ -8,21 +8,23 @@ from PyQt5.QtCore import Qt, QSize, pyqtSlot, QItemSelectionModel, QEvent
 from krita_sync.client_krita import KritaClient, ConnectionState, _get_document_name
 
 
-def _docker_document(docker):
+def _docker_document(source_docker):
     windows = Krita.instance().windows()
+    window = None
     for window in windows:
         dockers = window.dockers()
-        if docker in dockers:
+        if source_docker in dockers:
             break
-    if window.activeView() is None or window.activeView().document() is None:
+    if window is None or window.activeView() is None or window.activeView().document() is None:
         return None, None
     document = window.activeView().document()
     document_uuid = document.rootNode().uniqueId().toString()[1:-1]
     return document, document_uuid
 
 class MyListWidget(QListWidget):
-    def __init__(self, docker, *args, **kwargs):
+    def __init__(self, docker, frame, *args, **kwargs):
         self.docker = docker
+        self.frame = frame
         super(MyListWidget, self).__init__(*args, **kwargs)
 
     def selection_behavior_flags(self):
@@ -48,23 +50,23 @@ class MyListWidget(QListWidget):
         if len(deselected_indexes) > 0:
             deselected_index = deselected_indexes[0]
             deselected_item = self.item(deselected_index.row())
-            self.docker.remove_item_preview(deselected_item)
+            self.frame.remove_item_preview(deselected_item)
 
         select_indexes = selected.indexes()
         if len(select_indexes) > 0:
             selected_index = select_indexes[0]
             selected_item = self.item(selected_index.row())
 
-            self.docker.show_item_preview(selected_item)
+            self.frame.show_item_preview(selected_item)
 
-            if self.docker.selected_item is not None and self != self.docker.selected_item.listWidget():
+            if self.frame.selected_item is not None and self != self.frame.selected_item.listWidget():
                 # TODO: See if we can just get the selection model from the list widget and set that to have no selection instead
-                self.docker.selected_item.listWidget().setCurrentItem(None)
-            self.docker.selected_item = selected_item
-            self.docker.selected_item_uuid[document_id] = selected_item.data(Qt.ItemDataRole.UserRole)["image_uuid"]
+                self.frame.selected_item.listWidget().setCurrentItem(None)
+            self.frame.selected_item = selected_item
+            self.frame.selected_item_uuid[document_id] = selected_item.data(Qt.ItemDataRole.UserRole)["image_uuid"]
         else:
-            self.docker.selected_item = None
-            self.docker.selected_item_uuid[document_id] = None
+            self.frame.selected_item = None
+            self.frame.selected_item_uuid[document_id] = None
 
         super(MyListWidget, self).selectionChanged(selected, deselected)
 
@@ -111,7 +113,7 @@ class GenHistoryWidget(QFrame):
 
     def add_run(self, document, document_id, run_uuid, images_metadata):
         if run_uuid not in self.list_widgets:
-            list_widget = MyListWidget(self)
+            list_widget = MyListWidget(self.docker, self)
             list_widget.setMinimumHeight(self.thumb_size + 2)
             list_widget.setResizeMode(QListView.ResizeMode.Adjust)
             list_widget.setVerticalScrollBarPolicy(Qt.ScrollBarPolicy.ScrollBarAlwaysOff)
@@ -169,9 +171,10 @@ class GenHistoryWidget(QFrame):
         if document_id == document_uuid:
             self.add_run(document, document_id, run_uuid, images_metadata)
 
-    def document_changed_handler(self):
+    def document_changed_handler(self, changed_document_uuid):
         document, document_id = _docker_document(self.docker)
-        if document is None:
+        if document is None or changed_document_uuid != document_id:
+            print("Document none or not matching.")
             return
 
         while self.layout().count():
@@ -302,7 +305,7 @@ class ComfyKritaSyncDocker(DockWidget):
                 document_uuid_short = document_uuid.split("-")[0]
                 document_name = _get_document_name(document)
                 self.label_document.setText(f"Current Document: {document_name} ({document_uuid_short})")
-                KritaClient.instance().document_changed.emit()
+                KritaClient.instance().document_changed.emit(document_uuid)
 
     @pyqtSlot()
     def toggle_connection(self):
