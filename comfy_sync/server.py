@@ -53,6 +53,7 @@ async def krita_websocket_handler(request):
                     ws_krita.KritaWsManager.instance().documents = base_map
                     ws_krita.KritaWsManager.instance().document_combo = ["Missing Document"] + list(ws_krita.KritaWsManager.instance().documents.keys())
                     nodes.GetImageKrita.update_return_types()
+                    nodes.SendImageKrita.update_return_types()
                     PromptServer.instance.send_sync("cks_refresh", {})
 
     finally:
@@ -61,6 +62,7 @@ async def krita_websocket_handler(request):
         ws_krita.KritaWsManager.instance().documents = base_map
         ws_krita.KritaWsManager.instance().document_combo = ["Missing Document"] + list(ws_krita.KritaWsManager.instance().documents.keys())
         nodes.GetImageKrita.update_return_types()
+        nodes.SendImageKrita.update_return_types()
         PromptServer.instance.send_sync("cks_refresh", {})
 
     return ws

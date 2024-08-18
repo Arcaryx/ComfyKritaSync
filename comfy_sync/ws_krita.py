@@ -50,6 +50,7 @@ class KritaWsManager:
                     if document_combo_item not in self.document_combo:
                         self.document_combo.append(document_combo_item)
                         nodes.GetImageKrita.update_return_types()  # FIXME: Clear these after?
+                        nodes.SendImageKrita.update_return_types()  # FIXME: Clear these after?
 
         return json_data
 

@@ -30,10 +30,15 @@ class SendImageKrita:
             },
         }
 
-    RETURN_TYPES = ()
+    RETURN_TYPES = (KritaWsManager.instance().document_combo,)
+    RETURN_NAMES = ("document",)
     FUNCTION = "send_image_krita"
     OUTPUT_NODE = True
     CATEGORY = "cks"
+
+    @classmethod
+    def update_return_types(cls):
+        cls.RETURN_TYPES = (KritaWsManager.instance().document_combo,)
 
     def send_image_krita(self, document, layer, images, prompt=None, extra_pnginfo=None):
         if document == "Missing Document":
@@ -82,7 +87,8 @@ class SendImageKrita:
         return {
             "ui": {
                 "images": results
-            }
+            },
+            "result": (document,)
         }
 
 
