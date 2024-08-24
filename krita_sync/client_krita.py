@@ -170,10 +170,28 @@ class KritaClient(QObject):
 
                 if get_image_krita_payload.krita_document == document_uuid:
                     target_layer_string = get_image_krita_payload.krita_layer
-                    target_layer = document.nodeByName(target_layer_string)
+
+                    layer_names = target_layer_string.split("/")
+                    if len(layer_names) == 1:
+                        target_layer = document.nodeByName(layer_names[0])
+                    else:
+                        print(layer_names)
+                        current_node = document.rootNode()
+                        for i in range(len(layer_names) - 1):
+                            current_node = self.getOrCreateGroupNode(document, current_node, layer_names[i], create_if_missing=False)
+                        found_nodes = current_node.findChildNodes(layer_names[-1], False, False, "grouplayer", 0)
+                        if len(found_nodes) > 0:
+                            target_layer = found_nodes[0]
+                        else:
+                            found_nodes = current_node.findChildNodes(layer_names[-1], False, False, "paintlayer", 0)
+                            if len(found_nodes) > 0:
+                                target_layer = found_nodes[0]
+                            else:
+                                target_layer = current_node
+
                     if target_layer is None:
                         raise Exception(f"Krita layer {target_layer_string} not found.")
-                    # TODO: Make sure we can pull a group of layers properly
+
                     pixel_data = target_layer.projectionPixelData(0, 0, document.width(), document.height())
                     q_image = QImage(pixel_data, document.width(), document.height(), QImage.Format.Format_ARGB32)
 
@@ -191,13 +209,15 @@ class KritaClient(QObject):
 
                     break
 
-    def getOrCreateGroupNode(self, doc: Krita.Document, parent_node, group_layer_name: str):
+    def getOrCreateGroupNode(self, doc: Krita.Document, parent_node, group_layer_name: str, create_if_missing: bool = True):
         group_nodes = parent_node.findChildNodes(group_layer_name, False, False, "grouplayer", 0)
 
         if len(group_nodes) == 0:
-            group_node = doc.createNode(group_layer_name, "grouplayer")
-            parent_node.addChildNode(group_node, None)
-            return group_node
+            if create_if_missing:
+                group_node = doc.createNode(group_layer_name, "grouplayer")
+                parent_node.addChildNode(group_node, None)
+                return group_node
+            return None
         else:
             return group_nodes[0]
 
