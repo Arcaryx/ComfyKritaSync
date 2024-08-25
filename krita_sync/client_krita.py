@@ -184,7 +184,8 @@ class KritaClient(QObject):
                     if len(layer_names) == 1:
                         node_list = _flatten_tree(document.rootNode())
                         node_list = [node for node in node_list if node.name() == layer_names[0] and node.type() in ["grouplayer", "paintlayer"]]
-                        target_layer = node_list[0]
+                        if len(node_list) > 0:
+                            target_layer = node_list[0]
                     else:
                         current_node = document.rootNode()
                         for i in range(len(layer_names) - 1):
