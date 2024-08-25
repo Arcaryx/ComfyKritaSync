@@ -53,6 +53,15 @@ def _get_document_name(document):
         return os.path.basename(document.fileName())
 
 
+def _flatten_tree(node):
+    result = [node]
+    child_nodes = node.childNodes()
+    child_nodes = sorted(child_nodes, key=lambda node: node.index(), reverse=True)
+    for child in child_nodes:
+        result.extend(_flatten_tree(child))
+    return result
+
+
 class KritaClient(QObject):
     websocket_updated = pyqtSignal(ConnectionState)
     websocket_message_received = pyqtSignal(CksBinaryMessage)
@@ -173,18 +182,21 @@ class KritaClient(QObject):
 
                     layer_names = target_layer_string.split("/")
                     if len(layer_names) == 1:
-                        target_layer = document.nodeByName(layer_names[0])
+                        node_list = _flatten_tree(document.rootNode())
+                        node_list = [node for node in node_list if node.name() == layer_names[0] and node.type() in ["grouplayer", "paintlayer"]]
+                        target_layer = node_list[0]
                     else:
-                        print(layer_names)
                         current_node = document.rootNode()
                         for i in range(len(layer_names) - 1):
                             current_node = self.getOrCreateGroupNode(document, current_node, layer_names[i], create_if_missing=False)
                         found_nodes = current_node.findChildNodes(layer_names[-1], False, False, "grouplayer", 0)
                         if len(found_nodes) > 0:
+                            found_nodes = sorted(found_nodes, key=lambda node: node.index(), reverse=True)
                             target_layer = found_nodes[0]
                         else:
                             found_nodes = current_node.findChildNodes(layer_names[-1], False, False, "paintlayer", 0)
                             if len(found_nodes) > 0:
+                                found_nodes = sorted(found_nodes, key=lambda node: node.index(), reverse=True)
                                 target_layer = found_nodes[0]
                             else:
                                 target_layer = current_node
@@ -219,6 +231,7 @@ class KritaClient(QObject):
                 return group_node
             return None
         else:
+            group_nodes = sorted(group_nodes, key=lambda node: node.index(), reverse=True)
             return group_nodes[0]
 
     def create(self, doc: Krita.Document, layer_name: str, img: QImage | None = None, preview: bool=False):
