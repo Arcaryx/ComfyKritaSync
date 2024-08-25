@@ -103,6 +103,19 @@ class KritaClient(QObject):
         if connected:
             self.documents_changed_handler(None)
 
+    def clear_history_for_document_id(self, document_id):
+        # Get all image IDs for those documents from self.run_map and delete the images in self.image_map, as well as the runs from self.run_map
+        if document_id in self.run_map:
+            print(f"Found runs to clear for document {document_id}!")
+            # Get all image_ids for the document
+            for run_id, images_metadata in self.run_map[document_id].items():
+                for image_metadata in images_metadata:
+                    image_id = image_metadata["image_uuid"]
+                    if image_id in self.image_map:
+                        print(f"deleting image {image_id}")
+                        del self.image_map[image_id]
+            del self.run_map[document_id]
+
     def documents_changed_handler(self, _):
         if self._websocket is not None:
             documents = Krita.instance().documents()
@@ -122,14 +135,7 @@ class KritaClient(QObject):
 
             # Get all image IDs for those documents from self.run_map and delete the images in self.image_map, as well as the runs from self.run_map
             for missing_doc_id in missing_document_ids:
-                if missing_doc_id in self.run_map:
-                    # Get all image_ids for the document
-                    for run_id, images_metadata in self.run_map[missing_doc_id].items():
-                        for image_metadata in images_metadata:
-                            image_id = image_metadata["image_uuid"]
-                            if image_id in self.image_map:
-                                del self.image_map[image_id]
-                    del self.run_map[missing_doc_id]
+                self.clear_history_for_document_id(missing_doc_id)
 
             message = CksBinaryMessage(DocumentSyncJsonPayload(self.document_list))
             message_bytes = message.encode_message()

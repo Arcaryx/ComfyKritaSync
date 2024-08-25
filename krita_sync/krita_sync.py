@@ -299,12 +299,16 @@ class ComfyKritaSyncDocker(DockWidget):
         document_widget.layout().addWidget(self.label_document_uuid)
         document_widget.layout().addStretch(1)
 
+        self.button_clear_all = QPushButton("Clear All")
+        self.button_clear_all.clicked.connect(self.clear_all)
+        document_widget.layout().addWidget(self.button_clear_all)
+
         # History Widget
         scroll_area = QScrollArea()
         scroll_area.setWidgetResizable(True)
 
-        history_widget = GenHistoryWidget(main_widget, self)
-        scroll_area.setWidget(history_widget)
+        self.history_widget = GenHistoryWidget(main_widget, self)
+        scroll_area.setWidget(self.history_widget)
         main_widget.layout().addWidget(scroll_area)
 
         # Websocket Setup
@@ -333,6 +337,13 @@ class ComfyKritaSyncDocker(DockWidget):
             client.connection_coroutine = client.run(client.connect(self.line_url.text()))
         elif connection_state == ConnectionState.Connecting:
             client.kill_connection_coroutine()
+
+    @pyqtSlot()
+    def clear_all(self):
+        document, document_uuid = _docker_document(self)
+        client = KritaClient.instance()
+        client.clear_history_for_document_id(document_uuid)
+        self.history_widget.document_changed_handler(document_uuid)
 
     def websocket_updated(self, state):
         if state == ConnectionState.Disconnected:
