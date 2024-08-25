@@ -253,6 +253,14 @@ class GenHistoryWidget(QFrame):
         list_widget.setFixedHeight(num_rows * (self.thumb_size + 5) + 4)
 
 
+class NoMinSizeQLabel(QLabel):
+    def __init__(self, parent=None):
+        super().__init__(parent)
+
+    def minimumSizeHint(self):
+        return QSize(0, 0)
+
+
 class ComfyKritaSyncDocker(DockWidget):
     def __init__(self):
         super().__init__()
@@ -282,13 +290,14 @@ class ComfyKritaSyncDocker(DockWidget):
         main_widget.layout().addWidget(document_widget)
         document_widget.setLayout(QHBoxLayout())
         document_widget.layout().setContentsMargins(11, 0, 11, 0)
-        self.label_document_name = QLabel("Current Document: -")
-        self.label_document_name.setSizePolicy(QSizePolicy.Ignored, QSizePolicy.Preferred)
+        self.label_document_name = NoMinSizeQLabel("Current Document: -")
+        self.label_document_name.setSizePolicy(QSizePolicy.Maximum, QSizePolicy.Preferred)
         self.label_document_uuid = QLabel(" (-)")
         self.label_document_uuid.setSizePolicy(QSizePolicy.Fixed, QSizePolicy.Preferred)
 
         document_widget.layout().addWidget(self.label_document_name)
         document_widget.layout().addWidget(self.label_document_uuid)
+        document_widget.layout().addStretch(1)
 
         # History Widget
         scroll_area = QScrollArea()
