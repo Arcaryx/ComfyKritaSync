@@ -282,8 +282,13 @@ class ComfyKritaSyncDocker(DockWidget):
         main_widget.layout().addWidget(document_widget)
         document_widget.setLayout(QHBoxLayout())
         document_widget.layout().setContentsMargins(11, 0, 11, 0)
-        self.label_document = QLabel("Current Document: -")
-        document_widget.layout().addWidget(self.label_document)
+        self.label_document_name = QLabel("Current Document: -")
+        self.label_document_name.setSizePolicy(QSizePolicy.Ignored, QSizePolicy.Preferred)
+        self.label_document_uuid = QLabel(" (-)")
+        self.label_document_uuid.setSizePolicy(QSizePolicy.Fixed, QSizePolicy.Preferred)
+
+        document_widget.layout().addWidget(self.label_document_name)
+        document_widget.layout().addWidget(self.label_document_uuid)
 
         # History Widget
         scroll_area = QScrollArea()
@@ -304,7 +309,9 @@ class ComfyKritaSyncDocker(DockWidget):
             if document is not None:
                 document_uuid_short = document_uuid.split("-")[0]
                 document_name = _get_document_name(document)
-                self.label_document.setText(f"Current Document: {document_name} ({document_uuid_short})")
+                self.label_document_name.setText(f"Current Document: {document_name}")
+                self.label_document_uuid.setText(f"({document_uuid_short})")
+
                 KritaClient.instance().document_changed.emit(document_uuid)
 
     @pyqtSlot()
