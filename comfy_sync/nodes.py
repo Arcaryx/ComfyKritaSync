@@ -22,7 +22,8 @@ class SendImageKrita:
         return {"required": {
             "document": (KritaWsManager.instance().document_combo,),
             "layer": ("STRING", {"default": "Generated"}),
-            "images": ("IMAGE",)
+            "images": ("IMAGE",),
+            "add_to_previous_run": ("BOOLEAN", {"default": False})
         },
             "hidden": {
                 "prompt": "PROMPT",
@@ -40,7 +41,7 @@ class SendImageKrita:
     def update_return_types(cls):
         cls.RETURN_TYPES = (KritaWsManager.instance().document_combo,)
 
-    def send_image_krita(self, document, layer, images, prompt=None, extra_pnginfo=None):
+    def send_image_krita(self, document, layer, images, add_to_previous_run, prompt=None, extra_pnginfo=None):
         if document == "Missing Document":
             raise Exception("Missing Document")
 
@@ -78,7 +79,8 @@ class SendImageKrita:
             json_payload = SendImageKritaJsonPayload(
                 krita_document=KritaWsManager.instance().documents[document][0],
                 krita_layer=layer,
-                run_uuid=PromptServer.instance.last_prompt_id
+                run_uuid=PromptServer.instance.last_prompt_id,
+                add_to_previous_run=add_to_previous_run
             )
             manager.send_sync(json_payload, result_images, KritaWsManager.instance().documents[document][1])
         else:

@@ -4,6 +4,7 @@ import asyncio
 import io
 import os
 import uuid
+from collections import OrderedDict
 from copy import copy
 from enum import IntEnum
 from tokenize import group
@@ -148,12 +149,21 @@ class KritaClient(QObject):
 
         if json_payload.type == MessageType.SendImageKrita:
             send_image_krita_payload = cast(SendImageKritaJsonPayload, json_payload)
+
             documents = Krita.instance().documents()
             document_ids = [document.rootNode().uniqueId().toString()[1:-1] for document in documents]
 
             if send_image_krita_payload.krita_document not in document_ids:
                 print(f"Krita document {send_image_krita_payload.krita_document} not found, skipping.")
                 return
+
+            if (send_image_krita_payload.add_to_previous_run
+                and send_image_krita_payload.krita_document in self.run_map
+                and len(self.run_map[send_image_krita_payload.krita_document]) > 0):
+                previous_run_uuid = next(reversed(self.run_map[send_image_krita_payload.krita_document]))
+                run_uuid = previous_run_uuid
+            else:
+                run_uuid = send_image_krita_payload.run_uuid
 
             images_metadata = []
             for payload in decoded_message.payloads:
@@ -167,14 +177,15 @@ class KritaClient(QObject):
 
                 self.image_map[image_uuid] = image
                 if send_image_krita_payload.krita_document in self.run_map:
-                    if send_image_krita_payload.run_uuid in self.run_map[send_image_krita_payload.krita_document]:
-                        self.run_map[send_image_krita_payload.krita_document][send_image_krita_payload.run_uuid].append(image_metadata)
+                    if run_uuid in self.run_map[send_image_krita_payload.krita_document]:
+                        self.run_map[send_image_krita_payload.krita_document][run_uuid].append(image_metadata)
                     else:
-                        self.run_map[send_image_krita_payload.krita_document][send_image_krita_payload.run_uuid] = [image_metadata]
+                        self.run_map[send_image_krita_payload.krita_document][run_uuid] = [image_metadata]
                 else:
-                    self.run_map[send_image_krita_payload.krita_document] = {send_image_krita_payload.run_uuid: [image_metadata]}
+                    self.run_map[send_image_krita_payload.krita_document] = OrderedDict()
+                    self.run_map[send_image_krita_payload.krita_document][run_uuid] = [image_metadata]
                 images_metadata.append(image_metadata)
-            self.image_added.emit(send_image_krita_payload.krita_document, send_image_krita_payload.run_uuid, images_metadata)
+            self.image_added.emit(send_image_krita_payload.krita_document, run_uuid, images_metadata)
 
         elif json_payload.type == MessageType.GetImageKrita:
             get_image_krita_payload = cast(GetImageKritaJsonPayload, json_payload)

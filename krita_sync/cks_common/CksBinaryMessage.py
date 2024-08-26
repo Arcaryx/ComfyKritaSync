@@ -58,12 +58,14 @@ class SendImageKritaJsonPayload(CksJsonPayload):
     krita_document: str
     krita_layer: str
     run_uuid: str
+    add_to_previous_run: bool
 
-    def __init__(self, krita_document: str, krita_layer: str, run_uuid: str):
+    def __init__(self, krita_document: str, krita_layer: str, run_uuid: str, add_to_previous_run: bool):
         super().__init__(MessageType.SendImageKrita)
         self.krita_document = krita_document
         self.krita_layer = krita_layer
         self.run_uuid = run_uuid
+        self.add_to_previous_run = add_to_previous_run
 
     @classmethod
     def deserialize(cls, payload_dict: dict) -> 'SendImageKritaJsonPayload':
