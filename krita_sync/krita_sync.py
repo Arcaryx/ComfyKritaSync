@@ -21,11 +21,31 @@ def _docker_document(source_docker):
     document_uuid = document.rootNode().uniqueId().toString()[1:-1]
     return document, document_uuid
 
-class MyListWidget(QListWidget):
-    def __init__(self, docker, frame, *args, **kwargs):
+class RunListWidget(QListWidget):
+    def __init__(self, docker, frame, run_uuid, parent=None):
+        super().__init__(parent)
+
         self.docker = docker
         self.frame = frame
-        super(MyListWidget, self).__init__(*args, **kwargs)
+        self.run_uuid = run_uuid
+
+        # , Qt.ShortcutContext.WidgetWithChildrenShortcut
+        QShortcut(Qt.Key.Key_Delete, self, self.discard_image, self.discard_image_ambiguously)
+
+    # def keyPressEvent(self, event):
+    #     print("RunListWidget::keyPressEvent")
+    #     if event.key() == Qt.Key_Delete:
+    #         self.discard_image()
+    #     else:
+    #         super().keyPressEvent(event)
+
+    def discard_image(self):
+        print("RunListWidget::discard_image")
+        self.frame.discard_image(self.run_uuid)
+
+    def discard_image_ambiguously(self):
+        print("RunListWidget::discard_image_ambiguously")
+        self.frame.discard_image(self.run_uuid)
 
     def selection_behavior_flags(self):
         if self.selectionBehavior == QAbstractItemView.SelectionBehavior.SelectRows:
@@ -41,7 +61,7 @@ class MyListWidget(QListWidget):
                 return QItemSelectionModel.NoUpdate
             return QItemSelectionModel.Clear | QItemSelectionModel.Toggle | self.selection_behavior_flags()
 
-        return super(MyListWidget, self).selectionCommand(index, event)
+        return super(RunListWidget, self).selectionCommand(index, event)
 
     def selectionChanged(self, selected, deselected):
         document, document_id = _docker_document(self.docker)
@@ -68,7 +88,7 @@ class MyListWidget(QListWidget):
             self.frame.selected_item = None
             self.frame.selected_item_uuid[document_id] = None
 
-        super(MyListWidget, self).selectionChanged(selected, deselected)
+        super(RunListWidget, self).selectionChanged(selected, deselected)
 
 class ComfyKritaSyncExtension(Extension):
     def __init__(self, parent):
@@ -113,7 +133,7 @@ class GenHistoryWidget(QFrame):
 
     def add_run(self, document, document_id, run_uuid, images_metadata):
         if run_uuid not in self.list_widgets:
-            list_widget = MyListWidget(self.docker, self)
+            list_widget = RunListWidget(self.docker, self, run_uuid, parent=self)
             list_widget.setMinimumHeight(self.thumb_size + 2)
             list_widget.setResizeMode(QListView.ResizeMode.Adjust)
             list_widget.setVerticalScrollBarPolicy(Qt.ScrollBarPolicy.ScrollBarAlwaysOff)
@@ -162,6 +182,20 @@ class GenHistoryWidget(QFrame):
 
         QApplication.processEvents()  # TODO: Is there a lighter weight solution for updating the viewport of a list?
         self.adjust_list_widget_height(self.list_widgets[run_uuid])
+
+    def discard_image(self, run_uuid):
+        print("GenHistoryWidget::discard_image")
+        document, document_id = _docker_document(self.docker)
+        if document is None:
+            return
+
+        if document_id in self.selected_item_uuid:
+            image_uuid = self.selected_item_uuid[document_id]
+            client = KritaClient.instance()
+            client.discard_image(document_id, run_uuid, image_uuid)
+            self.remove_item_preview(self.selected_item)
+            self.selected_item_uuid.pop(document_id)
+            self.selected_item = None
 
     def image_added_handler(self, document_uuid, run_uuid, images_metadata):
         document, document_id = _docker_document(self.docker)
