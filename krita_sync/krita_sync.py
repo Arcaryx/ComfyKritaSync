@@ -342,6 +342,12 @@ class ComfyKritaSyncDocker(DockWidget):
     def clear_all(self):
         document, document_uuid = _docker_document(self)
         client = KritaClient.instance()
+
+        if document_uuid in self.history_widget.selected_item_uuid:
+            self.history_widget.remove_item_preview(self.history_widget.selected_item)
+            del self.history_widget.selected_item_uuid[document_uuid]
+            self.history_widget.selected_item = None
+
         client.clear_history_for_document_id(document_uuid)
         self.history_widget.document_changed_handler(document_uuid)
 
