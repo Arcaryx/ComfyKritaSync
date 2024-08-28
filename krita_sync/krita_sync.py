@@ -31,12 +31,24 @@ class RunListWidget(QListWidget):
         print("CREATING RunListWidget")
         QShortcut(Qt.Key.Key_Delete, self, self.discard_image, self.discard_image_ambiguously, Qt.ShortcutContext.WidgetShortcut)
 
+    def event(self, event):
+        print(f"RunListWidget::event - {event.type()}")
+        if(event.type() == QEvent.KeyPress and event.key() == Qt.Key_Delete):
+            print("RunListWidget::event - Delete pressed!")
+        return super().event(event)
+
     def keyPressEvent(self, event):
         print("RunListWidget::keyPressEvent")
         if event.key() == Qt.Key_Delete:
             self.discard_image()
         else:
             super().keyPressEvent(event)
+
+    def focusInEvent(self, event):
+        print("RunListWidget::focusInEvent")
+
+    def focusOutEvent(self, event):
+        print("RunListWidget::focusOutEvent")
 
     def discard_image(self):
         print("RunListWidget::discard_image")
