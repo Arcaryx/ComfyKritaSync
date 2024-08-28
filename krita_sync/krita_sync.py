@@ -1,6 +1,6 @@
 import uuid
 
-from PyQt5.QtGui import QIcon, QPixmap, QPainter, QColor
+from PyQt5.QtGui import QIcon, QPixmap, QPainter, QColor, QGuiApplication
 from krita import Krita, Extension, DockWidget, DockWidgetFactory, DockWidgetFactoryBase  # type: ignore
 from PyQt5.QtWidgets import *
 from PyQt5.QtCore import Qt, QSize, pyqtSlot, QItemSelectionModel, QEvent
@@ -28,16 +28,15 @@ class RunListWidget(QListWidget):
         self.docker = docker
         self.frame = frame
         self.run_uuid = run_uuid
+        print("CREATING RunListWidget")
+        QShortcut(Qt.Key.Key_Delete, self, self.discard_image, self.discard_image_ambiguously, Qt.ShortcutContext.WidgetShortcut)
 
-        # , Qt.ShortcutContext.WidgetWithChildrenShortcut
-        QShortcut(Qt.Key.Key_Delete, self, self.discard_image, self.discard_image_ambiguously)
-
-    # def keyPressEvent(self, event):
-    #     print("RunListWidget::keyPressEvent")
-    #     if event.key() == Qt.Key_Delete:
-    #         self.discard_image()
-    #     else:
-    #         super().keyPressEvent(event)
+    def keyPressEvent(self, event):
+        print("RunListWidget::keyPressEvent")
+        if event.key() == Qt.Key_Delete:
+            self.discard_image()
+        else:
+            super().keyPressEvent(event)
 
     def discard_image(self):
         print("RunListWidget::discard_image")
@@ -56,12 +55,21 @@ class RunListWidget(QListWidget):
             return QItemSelectionModel.NoUpdate
 
     def selectionCommand(self, index, event, q_event=None, *args, **kwargs):
+        key_modifiers = Qt.NoModifier
+        if event:
+            if event.type() in [QEvent.MouseButtonDblClick, QEvent.MouseButtonPress, QEvent.MouseButtonRelease, QEvent.MouseMove, QEvent.KeyPress, QEvent.KeyRelease]:
+                key_modifiers = event.modifiers()
+            else:
+                key_modifiers = QGuiApplication.keyboardModifiers()
+
         if self.selectionMode() == QAbstractItemView.SingleSelection:
             if event and event.type() == QEvent.MouseButtonRelease:
                 return QItemSelectionModel.NoUpdate
+            elif event and event.type() == QEvent.KeyPress and self.selectionModel().isSelected(index) and (key_modifiers & Qt.ControlModifier) and event.key() == Qt.Key_Space:
+                return QItemSelectionModel.Deselect | self.selection_behavior_flags()
             return QItemSelectionModel.Clear | QItemSelectionModel.Toggle | self.selection_behavior_flags()
 
-        return super(RunListWidget, self).selectionCommand(index, event)
+        return super().selectionCommand(index, event)
 
     def selectionChanged(self, selected, deselected):
         document, document_id = _docker_document(self.docker)
@@ -88,7 +96,7 @@ class RunListWidget(QListWidget):
             self.frame.selected_item = None
             self.frame.selected_item_uuid[document_id] = None
 
-        super(RunListWidget, self).selectionChanged(selected, deselected)
+        super().selectionChanged(selected, deselected)
 
 class ComfyKritaSyncExtension(Extension):
     def __init__(self, parent):
