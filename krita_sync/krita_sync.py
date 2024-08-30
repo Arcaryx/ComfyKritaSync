@@ -47,6 +47,12 @@ class RunListWidget(QListWidget):
             if selected_item_index.isValid():
                 self.takeItem(selected_item_index.row())
 
+            if self.count() == 0:
+                print(f"BEFORE: len of list_widgets: {len(self.frame.list_widgets)}")
+                self.frame.list_widgets.pop(self.run_uuid)
+                print(f"AFTER: len of list_widgets: {len(self.frame.list_widgets)}")
+                self.deleteLater()
+
     def selection_behavior_flags(self):
         if self.selectionBehavior == QAbstractItemView.SelectionBehavior.SelectRows:
             return QItemSelectionModel.Rows
