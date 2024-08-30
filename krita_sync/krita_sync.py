@@ -48,9 +48,9 @@ class RunListWidget(QListWidget):
                 self.takeItem(selected_item_index.row())
 
             if self.count() == 0:
-                print(f"BEFORE: len of list_widgets: {len(self.frame.list_widgets)}")
                 self.frame.list_widgets.pop(self.run_uuid)
-                print(f"AFTER: len of list_widgets: {len(self.frame.list_widgets)}")
+                client = KritaClient.instance()
+                client.run_map[document_id].pop(self.run_uuid)
                 self.deleteLater()
 
     def selection_behavior_flags(self):
@@ -101,7 +101,7 @@ class RunListWidget(QListWidget):
             self.frame.selected_item_uuid[document_id] = selected_item.data(Qt.ItemDataRole.UserRole)["image_uuid"]
         else:
             self.frame.selected_item = None
-            self.frame.selected_item_uuid[document_id] = None
+            self.frame.selected_item_uuid.pop(document_id)
 
         super().selectionChanged(selected, deselected)
 
@@ -208,8 +208,6 @@ class GenHistoryWidget(QFrame):
             client = KritaClient.instance()
             client.discard_image(document_id, run_uuid, image_uuid)
             self.remove_item_preview(self.selected_item)
-            self.selected_item_uuid.pop(document_id)
-            self.selected_item = None
 
     def image_added_handler(self, document_uuid, run_uuid, images_metadata):
         document, document_id = _docker_document(self.docker)
