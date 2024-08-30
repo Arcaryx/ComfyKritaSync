@@ -203,6 +203,8 @@ class GenHistoryWidget(QFrame):
 
             client.discard_image(document_id, run_uuid, image_uuid)
 
+            self.adjust_list_widget_height(list_widget)
+
             if list_widget.count() == 0:
                 self.list_widgets.pop(run_uuid)
                 client.run_map[document_id].pop(run_uuid)
