@@ -30,28 +30,10 @@ class RunListWidget(QListWidget):
         self.run_uuid = run_uuid
         self.setContextMenuPolicy(Qt.ContextMenuPolicy.CustomContextMenu)
 
-        QShortcut(QKeySequence(Qt.CTRL + Qt.Key_Delete), self, self.discard_image, self.discard_image, Qt.ShortcutContext.WidgetShortcut)
-
-    def discard_image(self):
-        document, document_id = _docker_document(self.docker)
-        if document is None:
-            return
-
-        # TODO: Yes, this is cancer, we need to clean up the spaghetti :(
-        if document_id in self.frame.selected_item_uuid:
-            # Get the item's index before we clean it up elsewhere
-            selected_item_index = self.indexFromItem(self.frame.selected_item)
-            # Clean up data structures elsewhere
-            self.frame.discard_image(self.run_uuid)
-            # Finally kill the item from the list...
-            if selected_item_index.isValid():
-                self.takeItem(selected_item_index.row())
-
-            if self.count() == 0:
-                self.frame.list_widgets.pop(self.run_uuid)
-                client = KritaClient.instance()
-                client.run_map[document_id].pop(self.run_uuid)
-                self.deleteLater()
+    def discard_image(self, item):
+        selected_item_index = self.indexFromItem(item)
+        if selected_item_index.isValid():
+            self.takeItem(selected_item_index.row())
 
     def selection_behavior_flags(self):
         if self.selectionBehavior == QAbstractItemView.SelectionBehavior.SelectRows:
@@ -121,8 +103,10 @@ class ComfyKritaSyncExtension(Extension):
         pass
 
     def createActions(self, window):
+        client = KritaClient.instance()
         # Actions
-        pass
+        action = window.createAction("deleteCKSImage", "Delete CKS Image")
+        action.triggered.connect(client.delete_cks_image)
 
 
 class GenHistoryWidget(QFrame):
@@ -145,6 +129,7 @@ class GenHistoryWidget(QFrame):
         client = KritaClient.instance()
         client.image_added.connect(self.image_added_handler)
         client.document_changed.connect(self.document_changed_handler)
+        client.delete_selected_image.connect(self.discard_image)
 
     def add_run(self, document, document_id, run_uuid, images_metadata):
         if run_uuid not in self.list_widgets:
@@ -198,16 +183,28 @@ class GenHistoryWidget(QFrame):
         QApplication.processEvents()  # TODO: Is there a lighter weight solution for updating the viewport of a list?
         self.adjust_list_widget_height(self.list_widgets[run_uuid])
 
-    def discard_image(self, run_uuid):
+    def discard_image(self):
         document, document_id = _docker_document(self.docker)
         if document is None:
             return
 
+        client = KritaClient.instance()
+
         if document_id in self.selected_item_uuid:
-            image_uuid = self.selected_item_uuid[document_id]
-            client = KritaClient.instance()
-            client.discard_image(document_id, run_uuid, image_uuid)
             self.remove_item_preview(self.selected_item)
+
+            image_uuid = self.selected_item_uuid[document_id]
+            run_uuid = self.selected_item.data(Qt.ItemDataRole.UserRole)["run_uuid"]
+
+            list_widget = self.list_widgets[run_uuid]
+            list_widget.discard_image(self.selected_item)
+
+            client.discard_image(document_id, run_uuid, image_uuid)
+
+            if list_widget.count() == 0:
+                self.list_widgets.pop(run_uuid)
+                client.run_map[document_id].pop(run_uuid)
+                list_widget.deleteLater()
 
     def image_added_handler(self, document_uuid, run_uuid, images_metadata):
         document, document_id = _docker_document(self.docker)

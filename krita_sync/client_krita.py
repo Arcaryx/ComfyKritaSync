@@ -68,6 +68,7 @@ class KritaClient(QObject):
     websocket_message_received = pyqtSignal(CksBinaryMessage)
     image_added = pyqtSignal(str, str, list)
     document_changed = pyqtSignal(str)
+    delete_selected_image = pyqtSignal()
 
     def __init__(self):
         super().__init__()
@@ -99,6 +100,9 @@ class KritaClient(QObject):
         if cls._instance is None:
             cls._instance = KritaClient()
         return cls._instance
+
+    def delete_cks_image(self):
+        self.delete_selected_image.emit()
 
     def websocket_updated_handler(self, connected):
         if connected:
