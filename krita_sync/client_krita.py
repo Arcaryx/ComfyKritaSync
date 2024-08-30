@@ -105,7 +105,6 @@ class KritaClient(QObject):
             self.documents_changed_handler(None)
 
     def discard_image(self, document_id, run_uuid, image_uuid):
-        print("KritaClient::discard_image")
         if document_id in self.run_map and run_uuid in self.run_map[document_id]:
             images_metadata = self.run_map[document_id][run_uuid]
             for image_metadata in images_metadata:
@@ -118,13 +117,11 @@ class KritaClient(QObject):
     def clear_history_for_document_id(self, document_id):
         # Get all image IDs for those documents from self.run_map and delete the images in self.image_map, as well as the runs from self.run_map
         if document_id in self.run_map:
-            print(f"Found runs to clear for document {document_id}!")
             # Get all image_ids for the document
             for run_id, images_metadata in self.run_map[document_id].items():
                 for image_metadata in images_metadata:
                     image_id = image_metadata["image_uuid"]
                     if image_id in self.image_map:
-                        print(f"deleting image {image_id}")
                         del self.image_map[image_id]
             del self.run_map[document_id]
 

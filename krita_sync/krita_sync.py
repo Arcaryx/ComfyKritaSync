@@ -1,6 +1,6 @@
 import uuid
 
-from PyQt5.QtGui import QIcon, QPixmap, QPainter, QColor, QGuiApplication
+from PyQt5.QtGui import QIcon, QPixmap, QPainter, QColor, QGuiApplication, QKeySequence
 from krita import Krita, Extension, DockWidget, DockWidgetFactory, DockWidgetFactoryBase  # type: ignore
 from PyQt5.QtWidgets import *
 from PyQt5.QtCore import Qt, QSize, pyqtSlot, QItemSelectionModel, QEvent
@@ -28,35 +28,24 @@ class RunListWidget(QListWidget):
         self.docker = docker
         self.frame = frame
         self.run_uuid = run_uuid
-        print("CREATING RunListWidget")
-        QShortcut(Qt.Key.Key_Delete, self, self.discard_image, self.discard_image_ambiguously, Qt.ShortcutContext.WidgetShortcut)
+        self.setContextMenuPolicy(Qt.ContextMenuPolicy.CustomContextMenu)
 
-    def event(self, event):
-        print(f"RunListWidget::event - {event.type()}")
-        if(event.type() == QEvent.KeyPress and event.key() == Qt.Key_Delete):
-            print("RunListWidget::event - Delete pressed!")
-        return super().event(event)
-
-    def keyPressEvent(self, event):
-        print("RunListWidget::keyPressEvent")
-        if event.key() == Qt.Key_Delete:
-            self.discard_image()
-        else:
-            super().keyPressEvent(event)
-
-    def focusInEvent(self, event):
-        print("RunListWidget::focusInEvent")
-
-    def focusOutEvent(self, event):
-        print("RunListWidget::focusOutEvent")
+        QShortcut(QKeySequence(Qt.CTRL + Qt.Key_Delete), self, self.discard_image, self.discard_image, Qt.ShortcutContext.WidgetShortcut)
 
     def discard_image(self):
-        print("RunListWidget::discard_image")
-        self.frame.discard_image(self.run_uuid)
+        document, document_id = _docker_document(self.docker)
+        if document is None:
+            return
 
-    def discard_image_ambiguously(self):
-        print("RunListWidget::discard_image_ambiguously")
-        self.frame.discard_image(self.run_uuid)
+        # TODO: Yes, this is cancer, we need to clean up the spaghetti :(
+        if document_id in self.frame.selected_item_uuid:
+            # Get the item's index before we clean it up elsewhere
+            selected_item_index = self.indexFromItem(self.frame.selected_item)
+            # Clean up data structures elsewhere
+            self.frame.discard_image(self.run_uuid)
+            # Finally kill the item from the list...
+            if selected_item_index.isValid():
+                self.takeItem(selected_item_index.row())
 
     def selection_behavior_flags(self):
         if self.selectionBehavior == QAbstractItemView.SelectionBehavior.SelectRows:
@@ -204,7 +193,6 @@ class GenHistoryWidget(QFrame):
         self.adjust_list_widget_height(self.list_widgets[run_uuid])
 
     def discard_image(self, run_uuid):
-        print("GenHistoryWidget::discard_image")
         document, document_id = _docker_document(self.docker)
         if document is None:
             return
