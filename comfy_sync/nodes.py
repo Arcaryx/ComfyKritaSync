@@ -16,6 +16,12 @@ from .ws_krita import KritaWsManager
 from ..krita_sync.cks_common.CksBinaryMessage import GetImageKritaJsonPayload, SendImageKritaJsonPayload
 
 
+def update_node_return_types():
+    SendImageKrita.update_return_types()
+    GetImageKrita.update_return_types()
+    SelectKritaDocument.update_return_types()
+
+
 class SendImageKrita:
     @classmethod
     def INPUT_TYPES(s):
@@ -190,4 +196,28 @@ class GetImageKrita:
                 "images": results
             },
             "result": (output_image, output_mask, document)
+        }
+
+
+class SelectKritaDocument:
+    @classmethod
+    def INPUT_TYPES(s):
+        return {"required": {
+            "document": (KritaWsManager.instance().document_combo,)
+        }}
+
+    RETURN_TYPES = (KritaWsManager.instance().document_combo, )
+
+    @classmethod
+    def update_return_types(cls):
+        cls.RETURN_TYPES = (KritaWsManager.instance().document_combo, )
+
+    RETURN_NAMES = ("document", )
+    FUNCTION = "select_krita_document"
+    OUTPUT_NODE = False
+    CATEGORY = "cks"
+
+    def select_krita_document(self, document):
+        return {
+            "result": (document, )
         }
