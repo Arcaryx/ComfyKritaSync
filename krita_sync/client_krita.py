@@ -174,6 +174,7 @@ class KritaClient(QObject):
                 and len(self.run_map[send_image_krita_payload.krita_document]) > 0):
                 previous_run_uuid = next(reversed(self.run_map[send_image_krita_payload.krita_document]))
                 run_uuid = previous_run_uuid
+                send_image_krita_payload.run_uuid = run_uuid
             else:
                 run_uuid = send_image_krita_payload.run_uuid
 

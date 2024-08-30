@@ -7,17 +7,19 @@ from PyQt5.QtCore import Qt, QSize, pyqtSlot, QItemSelectionModel, QEvent
 
 from krita_sync.client_krita import KritaClient, ConnectionState, _get_document_name
 
-
-def _docker_document(source_docker):
+def _docker_document(source_docker, require_active_window=False):
     windows = Krita.instance().windows()
-    window = None
+    selected_window = None
     for window in windows:
+        if require_active_window and Krita.instance().activeWindow() != window:
+            continue
         dockers = window.dockers()
         if source_docker in dockers:
+            selected_window = window
             break
-    if window is None or window.activeView() is None or window.activeView().document() is None:
+    if selected_window is None or selected_window.activeView() is None or selected_window.activeView().document() is None:
         return None, None
-    document = window.activeView().document()
+    document = selected_window.activeView().document()
     document_uuid = document.rootNode().uniqueId().toString()[1:-1]
     return document, document_uuid
 
@@ -184,7 +186,7 @@ class GenHistoryWidget(QFrame):
         self.adjust_list_widget_height(self.list_widgets[run_uuid])
 
     def discard_image(self):
-        document, document_id = _docker_document(self.docker)
+        document, document_id = _docker_document(self.docker, True)
         if document is None:
             return
 
