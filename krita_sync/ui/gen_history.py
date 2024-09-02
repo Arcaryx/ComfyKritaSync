@@ -81,7 +81,7 @@ class GenHistoryWidget(QFrame):
 
                 item.setSelected(True)
 
-        QApplication.processEvents()  # TODO: Is there a lighter weight solution for updating the viewport of a list?
+        QApplication.processEvents()
         self.adjust_list_widget_height(self.list_widgets[run_uuid])
 
     def discard_image(self):

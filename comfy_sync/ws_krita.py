@@ -40,16 +40,18 @@ class KritaWsManager:
         return cls._instance
 
     def fix_document_combo(self, json_data):
+        # This exists to allow for QueueOnRemote, and it does not clean up after itself
+
         prompt = json_data["prompt"]
         for v in prompt.values():
             if "class_type" in v:
                 cls = v["class_type"]
-                if cls == "CKS_GetImageKrita" or cls == "CKS_SendImageKrita":
+                if cls == "CKS_GetImageKrita" or cls == "CKS_SendImageKrita" or cls == "CKS_SelectKritaDocument":
                     inputs = v["inputs"]
                     document_combo_item = inputs["document"]
                     if document_combo_item not in self.document_combo:
                         self.document_combo.append(document_combo_item)
-                        nodes.update_node_return_types()  #  FIXME: Clear these after?
+                        nodes.update_node_return_types()
 
         return json_data
 

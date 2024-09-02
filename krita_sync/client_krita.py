@@ -1,7 +1,6 @@
 from __future__ import annotations
 
 import asyncio
-import io
 import uuid
 from collections import OrderedDict
 from copy import copy
@@ -236,7 +235,7 @@ class KritaClient(QObject):
                     byte_array = buffer.data()
 
                     message = CksBinaryMessage(json_payload)
-                    message.add_payload(PayloadType.PNG, io.BytesIO(byte_array).getvalue())  # TODO: Is this necessary?
+                    message.add_payload(PayloadType.PNG, byte_array)
 
                     message_bytes = message.encode_message()
 
@@ -301,14 +300,18 @@ class KritaClient(QObject):
             else:
                 print(f"Couldn't find layer {layer_names[-1]} while searching for path {layer_name}")
 
-
-    # FIXME: We're not getting errors/logs at all when websockets fail to connect
     async def connect(self, url):
         try:
             url = url.replace("http", "ws", 1)
             self._connection_state = ConnectionState.Connecting
             self.websocket_updated.emit(self._connection_state)
-            async for self._websocket in ws_client.connect(f"{url}/krita-sync-ws?clientId={self._id}&clientType=krita", max_size=2 ** 30, read_limit=2 ** 30):
+
+            async for self._websocket in ws_client.connect(
+                uri=f"{url}/krita-sync-ws?clientId={self._id}&clientType=krita",
+                # logger=logging.getLogger(), if we need to add a logger
+                max_size=2 ** 30,
+                read_limit=2 ** 30
+            ):
                 try:
                     self._connection_state = ConnectionState.Connected
                     self.websocket_updated.emit(self._connection_state)

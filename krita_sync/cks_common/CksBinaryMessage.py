@@ -1,5 +1,6 @@
 import json
 import base64
+import time
 from dataclasses import dataclass
 from enum import Enum, IntEnum
 from typing import List
@@ -139,8 +140,8 @@ class CksBinaryMessage:
             message_parts.append(header.encode('utf-8'))
             message_parts.append(encoded_content)
 
-        # TODO: I feel like this is needlessly copying the byte arrays more than necessary, could actually be a performance issue
         encoded_message = b''.join(message_parts)
+
         return encoded_message
 
     @classmethod
