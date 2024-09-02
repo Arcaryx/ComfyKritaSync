@@ -135,8 +135,6 @@ class KritaClient(QObject):
             # Get a list of any document IDs that are now missing from new_document_ids compared to old_document_ids
             missing_document_ids = set(old_document_ids) - set(new_document_ids)
 
-            print(f"Missing document IDs: {missing_document_ids}")
-
             # Get all image IDs for those documents from self.run_map and delete the images in self.image_map, as well as the runs from self.run_map
             for missing_doc_id in missing_document_ids:
                 self.clear_history_for_document_id(missing_doc_id)
@@ -146,9 +144,7 @@ class KritaClient(QObject):
             self.run(self._websocket.send(message_bytes))
 
     def websocket_message_received_handler(self, decoded_message):
-        print(f"Total payloads: {len(decoded_message.payloads)}")
         json_payload = decoded_message.json_payload
-        print(json_payload)
 
         if json_payload.type == MessageType.SendImageKrita:
             send_image_krita_payload = cast(SendImageKritaJsonPayload, json_payload)

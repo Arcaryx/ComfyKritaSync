@@ -81,7 +81,5 @@ class KritaWsManager:
 
     async def publish_loop(self):
         while True:
-            print("Waiting for a message")
             msg = await self.messages.get()
-            print("Got a message!")
             await self.send(*msg)

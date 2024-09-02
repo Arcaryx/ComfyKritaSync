@@ -29,8 +29,7 @@ class CksJsonPayload:
     def serialize(self) -> str:
         try:
             result = json.dumps(self.__dict__)
-        except Exception as e:
-            print("Unable to serialize dict", e)
+        except Exception:
             raise ValueError(f"Unable to serialize dict: {self.__dict__}")
         return result
 

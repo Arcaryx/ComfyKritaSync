@@ -33,9 +33,7 @@ async def krita_websocket_handler(request):
                 print('ws connection.py closed with exception %s' % ws.exception())
             else:
                 decoded_message = CksBinaryMessage.decode_message(msg.data)
-                print(f"Total payloads: {len(decoded_message.payloads)}")
                 json_payload = decoded_message.json_payload
-                print(json_payload)
                 if json_payload.type == MessageType.GetImageKrita:
                     get_image_krita_payload = cast(GetImageKritaJsonPayload, json_payload)
                     (_, byte_array) = decoded_message.payloads[0]
@@ -56,6 +54,7 @@ async def krita_websocket_handler(request):
                     PromptServer.instance.send_sync("cks_refresh", {})
 
     finally:
+        print(f"Client {sid} of type {client_type} disconnected from krita-sync-ws")
         ws_krita.KritaWsManager.instance().sockets.pop(sid, None)
         base_map = {key: val for key, val in ws_krita.KritaWsManager.instance().documents.items() if val[1] != sid}
         ws_krita.KritaWsManager.instance().documents = base_map

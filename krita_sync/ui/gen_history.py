@@ -73,7 +73,6 @@ class GenHistoryWidget(QFrame):
             self.list_widgets[run_uuid].addItem(item)
 
             if document_id in self.history_selected_item_uuid and self.history_selected_item_uuid[document_id] == image_metadata["image_uuid"]:
-                print("Setting selected")
                 layer_name = self.get_item_preview_layer_name(item)
 
                 client = KritaClient.instance()
@@ -139,7 +138,6 @@ class GenHistoryWidget(QFrame):
     def document_changed_handler(self, changed_document_uuid):
         document, document_id = docker_document(self.docker)
         if document is None or changed_document_uuid != document_id:
-            print("Document none or not matching.")
             return
 
         while self.layout().count():
