@@ -16,9 +16,9 @@ class GenHistoryWidget(QFrame):
         self.thumb_size = 150
         self.uuid = str(uuid.uuid4())
         self.docker = docker
-        self.selected_item = None
+        self.history_selected_item = None
         # We're leaving this as a tiny memory leak, if it comes back to bite us than ¯\_(ツ)_/¯
-        self.selected_item_uuid = {}
+        self.history_selected_item_uuid = {}
 
         self.preview_image_layer_name = "[PREVIEW]"
 
@@ -33,7 +33,7 @@ class GenHistoryWidget(QFrame):
 
     def add_run(self, document, document_id, run_uuid, images_metadata):
         if run_uuid not in self.list_widgets:
-            list_widget = RunListWidget(self.docker, self, run_uuid, parent=self)
+            list_widget = RunListWidget(run_uuid, parent=self)
             list_widget.setMinimumHeight(self.thumb_size + 2)
             list_widget.setResizeMode(QListView.ResizeMode.Adjust)
             list_widget.setVerticalScrollBarPolicy(Qt.ScrollBarPolicy.ScrollBarAlwaysOff)
@@ -45,6 +45,7 @@ class GenHistoryWidget(QFrame):
             list_widget.setFrameStyle(QListWidget.NoFrame)
             list_widget.setDragEnabled(False)
             list_widget.itemActivated.connect(self.item_activated_handler)
+            list_widget.selection_changed.connect(self.selection_changed_handler)
 
             list_widget.setStyleSheet("QListWidget { border: 2px solid #475c7d; }")
 
@@ -71,7 +72,7 @@ class GenHistoryWidget(QFrame):
             item.setData(Qt.ItemDataRole.ToolTipRole, f"Target Layer: {image_metadata['krita_layer']}\nClick to toggle preview, double-click to apply.")
             self.list_widgets[run_uuid].addItem(item)
 
-            if document_id in self.selected_item_uuid and self.selected_item_uuid[document_id] == image_metadata["image_uuid"]:
+            if document_id in self.history_selected_item_uuid and self.history_selected_item_uuid[document_id] == image_metadata["image_uuid"]:
                 print("Setting selected")
                 layer_name = self.get_item_preview_layer_name(item)
 
@@ -90,14 +91,14 @@ class GenHistoryWidget(QFrame):
 
         client = KritaClient.instance()
 
-        if document_id in self.selected_item_uuid:
-            self.remove_item_preview(self.selected_item)
+        if document_id in self.history_selected_item_uuid:
+            self.remove_item_preview(self.history_selected_item)
 
-            image_uuid = self.selected_item_uuid[document_id]
-            run_uuid = self.selected_item.data(Qt.ItemDataRole.UserRole)["run_uuid"]
+            image_uuid = self.history_selected_item_uuid[document_id]
+            run_uuid = self.history_selected_item.data(Qt.ItemDataRole.UserRole)["run_uuid"]
 
             list_widget = self.list_widgets[run_uuid]
-            list_widget.discard_image(self.selected_item)
+            list_widget.discard_image(self.history_selected_item)
 
             client.discard_image(document_id, run_uuid, image_uuid)
 
@@ -116,6 +117,25 @@ class GenHistoryWidget(QFrame):
         if document_id == document_uuid:
             self.add_run(document, document_id, run_uuid, images_metadata)
 
+    def selection_changed_handler(self, selected_item: QListWidgetItem | None, deselected_item: QListWidgetItem | None):
+        document, document_id = docker_document(self.docker)
+
+        if deselected_item is not None:
+            self.remove_item_preview(deselected_item)
+
+        if selected_item is not None:
+            self.show_item_preview(selected_item)
+
+            if self.history_selected_item is not None and selected_item.listWidget() != self.history_selected_item.listWidget():
+                # This exists so that when you click between two runs, clicking back fires selectionChanged again
+                self.history_selected_item.listWidget().setCurrentItem(None)
+            self.history_selected_item = selected_item
+            self.history_selected_item_uuid[document_id] = selected_item.data(Qt.ItemDataRole.UserRole)["image_uuid"]
+
+        else:
+            self.history_selected_item = None
+            self.history_selected_item_uuid.pop(document_id)
+
     def document_changed_handler(self, changed_document_uuid):
         document, document_id = docker_document(self.docker)
         if document is None or changed_document_uuid != document_id:
@@ -127,7 +147,7 @@ class GenHistoryWidget(QFrame):
             if item.widget():
                 item.widget().deleteLater()
 
-        self.selected_item = None
+        self.history_selected_item = None
         self.list_widgets.clear()
 
         client = KritaClient.instance()

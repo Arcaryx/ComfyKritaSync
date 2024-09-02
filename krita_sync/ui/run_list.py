@@ -1,16 +1,14 @@
-from PyQt5.QtCore import Qt, QItemSelectionModel, QEvent
+from PyQt5.QtCore import Qt, QItemSelectionModel, QEvent, pyqtSignal
 from PyQt5.QtGui import QGuiApplication
-from PyQt5.QtWidgets import QListWidget, QAbstractItemView
-
-from krita_sync.util import docker_document
+from PyQt5.QtWidgets import QListWidget, QAbstractItemView, QListWidgetItem
 
 
 class RunListWidget(QListWidget):
-    def __init__(self, docker, frame, run_uuid, parent=None):
+    selection_changed = pyqtSignal(object, object)
+
+    def __init__(self, run_uuid, parent=None):
         super().__init__(parent)
 
-        self.docker = docker
-        self.frame = frame
         self.run_uuid = run_uuid
         self.setContextMenuPolicy(Qt.ContextMenuPolicy.CustomContextMenu)
 
@@ -45,28 +43,15 @@ class RunListWidget(QListWidget):
         return super().selectionCommand(index, event)
 
     def selectionChanged(self, selected, deselected):
-        document, document_id = docker_document(self.docker)
-
-        deselected_indexes = deselected.indexes()
-        if len(deselected_indexes) > 0:
-            deselected_index = deselected_indexes[0]
-            deselected_item = self.item(deselected_index.row())
-            self.frame.remove_item_preview(deselected_item)
-
         select_indexes = selected.indexes()
+        selected_item = None
         if len(select_indexes) > 0:
             selected_index = select_indexes[0]
             selected_item = self.item(selected_index.row())
-
-            self.frame.show_item_preview(selected_item)
-
-            if self.frame.selected_item is not None and self != self.frame.selected_item.listWidget():
-                # TODO: See if we can just get the selection model from the list widget and set that to have no selection instead
-                self.frame.selected_item.listWidget().setCurrentItem(None)
-            self.frame.selected_item = selected_item
-            self.frame.selected_item_uuid[document_id] = selected_item.data(Qt.ItemDataRole.UserRole)["image_uuid"]
-        else:
-            self.frame.selected_item = None
-            self.frame.selected_item_uuid.pop(document_id)
-
+        deselect_indexes = deselected.indexes()
+        deselected_item = None
+        if len(deselect_indexes) > 0:
+            deselected_index = deselect_indexes[0]
+            deselected_item = self.item(deselected_index.row())
+        self.selection_changed.emit(selected_item, deselected_item)
         super().selectionChanged(selected, deselected)
