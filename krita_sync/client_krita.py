@@ -2,24 +2,23 @@ from __future__ import annotations
 
 import asyncio
 import io
-import os
 import uuid
 from collections import OrderedDict
 from copy import copy
 from enum import IntEnum
-from tokenize import group
 
 from PyQt5.QtCore import QThread, pyqtSignal, QObject, QByteArray, QBuffer, QIODevice
-from PyQt5.QtGui import QImage, QImageWriter
+from PyQt5.QtGui import QImage
 from krita import Krita  # type: ignore
 
 from .cks_common.CksBinaryMessage import CksBinaryMessage, PayloadType, MessageType, GetImageKritaJsonPayload, DocumentSyncJsonPayload, SendImageKritaJsonPayload
+from krita_sync.util import get_document_name
 from .websockets.src.websockets import client as ws_client
 import traceback
 from typing import cast
 
 
-def print_exception_trace(exception):
+def _print_exception_trace(exception):
     traceback.print_exception(type(exception), exception, exception.__traceback__)
 
 
@@ -27,6 +26,7 @@ class ConnectionState(IntEnum):
     Disconnected = 0
     Connected = 1
     Connecting = 2
+
 
 class LoopThread(QThread):
     def __init__(self, loop):
@@ -44,14 +44,6 @@ def _extract_message_png_image(payload):
         return QImage.fromData(content, None)
     else:
         return None
-
-
-def _get_document_name(document):
-    document_name = document.fileName()
-    if (document_name is None) or (document_name == ""):
-        return document.name()
-    else:
-        return os.path.basename(document.fileName())
 
 
 def _flatten_tree(node):
@@ -136,7 +128,7 @@ class KritaClient(QObject):
             # Get old document IDs from self.document_list
             old_document_ids = [doc_id for doc_id, _ in self.document_list]
 
-            self.document_list = [(document.rootNode().uniqueId().toString()[1:-1], _get_document_name(document)) for document in documents]
+            self.document_list = [(document.rootNode().uniqueId().toString()[1:-1], get_document_name(document)) for document in documents]
 
             # Get new document IDs from self.document_list
             new_document_ids = [doc_id for doc_id, _ in self.document_list]
@@ -324,7 +316,7 @@ class KritaClient(QObject):
                         decoded_message = CksBinaryMessage.decode_message(message)
                         self.websocket_message_received.emit(decoded_message)
                 except Exception as e:
-                    print_exception_trace(e)
+                    _print_exception_trace(e)
                     print("Exception while processing ws messages, waiting 5 seconds before attempting to reconnect")
                     self._websocket = None
                     self._connection_state = ConnectionState.Connecting
