@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import asyncio
 import struct
+import types
 from io import BytesIO
 
 from server import BinaryEventTypes, PromptServer, send_socket_catch_exception  # type: ignore
@@ -30,6 +31,13 @@ class KritaWsManager:
         self.document_combo = ["Missing Document"]
         self.remote_documents = []
 
+        # This exists to function with ComfyUI_NetDist
+        self.original_put = PromptServer.instance.prompt_queue.put
+        def new_prompt_queue_put(self, item):
+            with self.mutex:
+                KritaWsManager.instance().clean_document_combo()
+                KritaWsManager.instance().original_put(item)
+        PromptServer.instance.prompt_queue.put = types.MethodType(new_prompt_queue_put, PromptServer.instance.prompt_queue)
         PromptServer.instance.add_on_prompt_handler(self.fix_document_combo)
 
     _instance: KritaWsManager | None = None
@@ -41,8 +49,7 @@ class KritaWsManager:
         return cls._instance
 
     def fix_document_combo(self, json_data):
-        # This exists to allow for QueueOnRemote, and it does not clean up after itself
-
+        # This exists to function with ComfyUI_NetDist
         prompt = json_data["prompt"]
         for v in prompt.values():
             if "class_type" in v:
