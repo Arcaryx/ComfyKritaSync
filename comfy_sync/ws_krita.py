@@ -28,6 +28,7 @@ class KritaWsManager:
         self.publish_task = self.loop.create_task(self.publish_loop())
         self.documents = dict()
         self.document_combo = ["Missing Document"]
+        self.remote_documents = []
 
         PromptServer.instance.add_on_prompt_handler(self.fix_document_combo)
 
@@ -50,10 +51,17 @@ class KritaWsManager:
                     inputs = v["inputs"]
                     document_combo_item = inputs["document"]
                     if document_combo_item not in self.document_combo:
+                        self.remote_documents.append(document_combo_item)
                         self.document_combo.append(document_combo_item)
                         nodes.update_node_return_types()
 
         return json_data
+
+    def clean_document_combo(self):
+        for document_combo_item in self.remote_documents:
+            self.document_combo.remove(document_combo_item)
+            nodes.update_node_return_types()
+        self.remote_documents = []
 
     async def send(self, json_payload: CksJsonPayload, image_data=None, sid=None):
         cks_message = CksBinaryMessage(json_payload)
