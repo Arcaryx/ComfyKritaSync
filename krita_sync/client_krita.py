@@ -66,7 +66,7 @@ class KritaClient(QObject):
         self._websocket = None
 
         self._loop = asyncio.new_event_loop()
-        self._loop.set_debug(True)
+        self._loop.set_debug(False)
         self._loop_thread = LoopThread(self._loop)
         self._loop_thread.start()
         self._id = str(uuid.uuid4())
