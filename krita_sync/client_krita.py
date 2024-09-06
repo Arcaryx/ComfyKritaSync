@@ -60,6 +60,7 @@ class KritaClient(QObject):
     image_added = pyqtSignal(str, str, list)
     document_changed = pyqtSignal(str)
     delete_selected_image = pyqtSignal()
+    delete_selected_run = pyqtSignal()
 
     def __init__(self):
         super().__init__()
@@ -94,6 +95,9 @@ class KritaClient(QObject):
 
     def delete_cks_image(self):
         self.delete_selected_image.emit()
+
+    def delete_cks_run(self):
+        self.delete_selected_run.emit()
 
     def websocket_updated_handler(self, connected):
         if connected:

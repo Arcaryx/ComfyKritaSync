@@ -30,6 +30,7 @@ class GenHistoryWidget(QFrame):
         client.image_added.connect(self.image_added_handler)
         client.document_changed.connect(self.document_changed_handler)
         client.delete_selected_image.connect(self.discard_image)
+        client.delete_selected_run.connect(self.discard_run)
 
     def add_run(self, document, document_id, run_uuid, images_metadata):
         if run_uuid not in self.list_widgets:
@@ -84,6 +85,12 @@ class GenHistoryWidget(QFrame):
         self.adjust_list_widget_height(self.list_widgets[run_uuid])
 
     def discard_image(self):
+        self._discard_image_or_run()
+
+    def discard_run(self):
+        self._discard_image_or_run(True)
+
+    def _discard_image_or_run(self, run=False):
         document, document_id = docker_document(self.docker, True)
         if document is None:
             return
@@ -93,17 +100,27 @@ class GenHistoryWidget(QFrame):
         if document_id in self.history_selected_item_uuid:
             self.remove_item_preview(self.history_selected_item)
 
-            image_uuid = self.history_selected_item_uuid[document_id]
             run_uuid = self.history_selected_item.data(Qt.ItemDataRole.UserRole)["run_uuid"]
-
             list_widget = self.list_widgets[run_uuid]
-            list_widget.discard_image(self.history_selected_item)
 
-            client.discard_image(document_id, run_uuid, image_uuid)
+            if run:
+                # We'll be deleting the whole widget soon, so no need to do list_widget.discard_image here, but we do need to clear the selected item
+                self.history_selected_item = None
+                self.history_selected_item_uuid.pop(document_id)
+
+                images_to_discard_metadata = client.run_map[document_id][run_uuid]
+                for image_to_discard_metadata in images_to_discard_metadata:
+                    image_uuid_to_discard = image_to_discard_metadata["image_uuid"]
+                    client.discard_image(document_id, run_uuid, image_uuid_to_discard)
+            else:
+                selected_item_uuid = self.history_selected_item_uuid[document_id]
+                list_widget.discard_image(self.history_selected_item)
+                client.discard_image(document_id, run_uuid, selected_item_uuid)
+
 
             self.adjust_list_widget_height(list_widget)
 
-            if list_widget.count() == 0:
+            if run or list_widget.count() == 0:
                 self.list_widgets.pop(run_uuid)
                 client.run_map[document_id].pop(run_uuid)
                 list_widget.deleteLater()

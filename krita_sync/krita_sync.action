@@ -15,5 +15,18 @@
         <isCheckable>false</isCheckable>
         <statusTip></statusTip>
         </Action>
+
+        <Action name="deleteCKSRun">
+        <icon></icon>
+        <text>Delete CKS Run</text>
+        <whatsThis></whatsThis>
+        <toolTip></toolTip>
+        <iconText></iconText>
+        <activationFlags>10000</activationFlags>
+        <activationConditions>0</activationConditions>
+        <shortcut>ctrl+shift+del</shortcut>
+        <isCheckable>false</isCheckable>
+        <statusTip></statusTip>
+        </Action>
     </Actions>
 </ActionCollection>

@@ -20,6 +20,8 @@ class ComfyKritaSyncExtension(Extension):
         client = KritaClient.instance()
         action = window.createAction("deleteCKSImage", "Delete CKS Image")
         action.triggered.connect(client.delete_cks_image)
+        action = window.createAction("deleteCKSRun", "Delete CKS Run")
+        action.triggered.connect(client.delete_cks_run)
 
 Krita.instance().addExtension(ComfyKritaSyncExtension(Krita.instance()))
 Krita.instance().addDockWidgetFactory(
