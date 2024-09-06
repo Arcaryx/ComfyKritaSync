@@ -211,6 +211,6 @@ class GenHistoryWidget(QFrame):
 
     def adjust_list_widget_height(self, list_widget):
         width = list_widget.viewport().width()
-        num_columns = (width - 1) // (self.thumb_size + 6)
+        num_columns = max(1, (width - 1) // (self.thumb_size + 6))
         num_rows = (list_widget.count() + num_columns - 1) // num_columns
         list_widget.setFixedHeight(num_rows * (self.thumb_size + 5) + 4)
