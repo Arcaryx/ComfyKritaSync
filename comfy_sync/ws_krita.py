@@ -66,8 +66,9 @@ class KritaWsManager:
 
     def clean_document_combo(self):
         for document_combo_item in self.remote_documents:
-            self.document_combo.remove(document_combo_item)
-            nodes.update_node_return_types()
+            if document_combo_item in self.document_combo:
+                self.document_combo.remove(document_combo_item)
+                nodes.update_node_return_types()
         self.remote_documents = []
 
     async def send(self, json_payload: CksJsonPayload, image_data=None, sid=None):
