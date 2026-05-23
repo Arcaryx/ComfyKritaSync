@@ -1,6 +1,6 @@
-from PyQt5.QtCore import Qt, QItemSelectionModel, QEvent, pyqtSignal
-from PyQt5.QtGui import QGuiApplication
-from PyQt5.QtWidgets import QListWidget, QAbstractItemView, QListWidgetItem
+from PyQt6.QtCore import Qt, QItemSelectionModel, QEvent, pyqtSignal
+from PyQt6.QtGui import QGuiApplication
+from PyQt6.QtWidgets import QListWidget, QAbstractItemView, QListWidgetItem
 
 
 class RunListWidget(QListWidget):
@@ -18,27 +18,44 @@ class RunListWidget(QListWidget):
             self.takeItem(selected_item_index.row())
 
     def selection_behavior_flags(self):
-        if self.selectionBehavior == QAbstractItemView.SelectionBehavior.SelectRows:
-            return QItemSelectionModel.Rows
-        elif self.selectionBehavior == QAbstractItemView.SelectionBehavior.SelectColumns:
-            return QItemSelectionModel.Columns
+        if self.selectionBehavior() == QAbstractItemView.SelectionBehavior.SelectRows:
+            return QItemSelectionModel.SelectionFlag.Rows
+        elif self.selectionBehavior() == QAbstractItemView.SelectionBehavior.SelectColumns:
+            return QItemSelectionModel.SelectionFlag.Columns
         else:
-            return QItemSelectionModel.NoUpdate
+            return QItemSelectionModel.SelectionFlag.NoUpdate
 
     def selectionCommand(self, index, event, q_event=None, *args, **kwargs):
-        key_modifiers = Qt.NoModifier
+        key_modifiers = Qt.KeyboardModifier.NoModifier
         if event:
-            if event.type() in [QEvent.MouseButtonDblClick, QEvent.MouseButtonPress, QEvent.MouseButtonRelease, QEvent.MouseMove, QEvent.KeyPress, QEvent.KeyRelease]:
+            if event.type() in [
+                QEvent.Type.MouseButtonDblClick,
+                QEvent.Type.MouseButtonPress,
+                QEvent.Type.MouseButtonRelease,
+                QEvent.Type.MouseMove,
+                QEvent.Type.KeyPress,
+                QEvent.Type.KeyRelease,
+            ]:
                 key_modifiers = event.modifiers()
             else:
                 key_modifiers = QGuiApplication.keyboardModifiers()
 
-        if self.selectionMode() == QAbstractItemView.SingleSelection:
-            if event and event.type() == QEvent.MouseButtonRelease:
-                return QItemSelectionModel.NoUpdate
-            elif event and event.type() == QEvent.KeyPress and self.selectionModel().isSelected(index) and (key_modifiers & Qt.ControlModifier) and event.key() == Qt.Key_Space:
-                return QItemSelectionModel.Deselect | self.selection_behavior_flags()
-            return QItemSelectionModel.Clear | QItemSelectionModel.Toggle | self.selection_behavior_flags()
+        if self.selectionMode() == QAbstractItemView.SelectionMode.SingleSelection:
+            if event and event.type() == QEvent.Type.MouseButtonRelease:
+                return QItemSelectionModel.SelectionFlag.NoUpdate
+            elif (
+                event
+                and event.type() == QEvent.Type.KeyPress
+                and self.selectionModel().isSelected(index)
+                and (key_modifiers & Qt.KeyboardModifier.ControlModifier)
+                and event.key() == Qt.Key.Key_Space
+            ):
+                return QItemSelectionModel.SelectionFlag.Deselect | self.selection_behavior_flags()
+            return (
+                QItemSelectionModel.SelectionFlag.Clear
+                | QItemSelectionModel.SelectionFlag.Toggle
+                | self.selection_behavior_flags()
+            )
 
         return super().selectionCommand(index, event)
 

@@ -25,5 +25,9 @@ class ComfyKritaSyncExtension(Extension):
 
 Krita.instance().addExtension(ComfyKritaSyncExtension(Krita.instance()))
 Krita.instance().addDockWidgetFactory(
-    DockWidgetFactory("comfyKritaSync", DockWidgetFactoryBase.DockRight, ComfyKritaSyncDocker)
+    DockWidgetFactory(
+        "comfyKritaSync",
+        DockWidgetFactoryBase.DockPosition.DockRight,
+        ComfyKritaSyncDocker,
+    )
 )

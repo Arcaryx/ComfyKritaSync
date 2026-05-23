@@ -1,8 +1,8 @@
 import uuid
 
-from PyQt5.QtGui import QColor, QPixmap, QPainter, QIcon
-from PyQt5.QtWidgets import QFrame, QVBoxLayout, QSizePolicy, QListView, QListWidget, QListWidgetItem, QApplication
-from PyQt5.QtCore import Qt, QSize
+from PyQt6.QtGui import QColor, QPixmap, QPainter, QIcon
+from PyQt6.QtWidgets import QFrame, QVBoxLayout, QSizePolicy, QListView, QListWidget, QListWidgetItem, QApplication
+from PyQt6.QtCore import Qt, QSize
 
 from krita_sync.client_krita import KritaClient
 from krita_sync.ui.run_list import RunListWidget
@@ -23,8 +23,8 @@ class GenHistoryWidget(QFrame):
         self.preview_image_layer_name = "[PREVIEW]"
 
         self.setLayout(QVBoxLayout())
-        self.layout().setAlignment(Qt.AlignTop)
-        self.setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Expanding)
+        self.layout().setAlignment(Qt.AlignmentFlag.AlignTop)
+        self.setSizePolicy(QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Expanding)
 
         client = KritaClient.instance()
         client.image_added.connect(self.image_added_handler)
@@ -43,7 +43,7 @@ class GenHistoryWidget(QFrame):
             list_widget.setViewMode(QListWidget.ViewMode.IconMode)
             list_widget.setIconSize(QSize(self.thumb_size, self.thumb_size))
             list_widget.setSelectionMode(QListWidget.SelectionMode.SingleSelection)
-            list_widget.setFrameStyle(QListWidget.NoFrame)
+            list_widget.setFrameStyle(QFrame.Shape.NoFrame)
             list_widget.setDragEnabled(False)
             list_widget.itemActivated.connect(self.item_activated_handler)
             list_widget.selection_changed.connect(self.selection_changed_handler)
@@ -61,14 +61,14 @@ class GenHistoryWidget(QFrame):
             thumb_pixmap.fill(QColor(0, 0, 0, 0))
 
             painter = QPainter(thumb_pixmap)
-            painter.setBackgroundMode(Qt.TransparentMode)
+            painter.setBackgroundMode(Qt.BGMode.TransparentMode)
 
             x = (thumb_pixmap.width() - scaled_image.width()) // 2
             y = (thumb_pixmap.height() - scaled_image.height()) // 2
             painter.drawImage(x, y, scaled_image)
             painter.end()
 
-            item = QListWidgetItem(QIcon(thumb_pixmap), None)
+            item = QListWidgetItem(QIcon(thumb_pixmap), "")
             item.setData(Qt.ItemDataRole.UserRole, image_metadata)
             item.setData(Qt.ItemDataRole.ToolTipRole, f"Target Layer: {image_metadata['krita_layer']}\nClick to toggle preview, double-click to apply.")
             self.list_widgets[run_uuid].addItem(item)

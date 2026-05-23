@@ -6,8 +6,8 @@ from collections import OrderedDict
 from copy import copy
 from enum import IntEnum
 
-from PyQt5.QtCore import QThread, pyqtSignal, QObject, QByteArray, QBuffer, QIODevice
-from PyQt5.QtGui import QImage
+from PyQt6.QtCore import QThread, pyqtSignal, QObject, QByteArray, QBuffer, QIODevice
+from PyQt6.QtGui import QImage
 from krita import Krita  # type: ignore
 
 from .cks_common.CksBinaryMessage import CksBinaryMessage, PayloadType, MessageType, GetImageKritaJsonPayload, DocumentSyncJsonPayload, SendImageKritaJsonPayload
@@ -230,7 +230,7 @@ class KritaClient(QObject):
                     q_image = QImage(pixel_data, document.width(), document.height(), QImage.Format.Format_ARGB32)
 
                     buffer = QBuffer()
-                    buffer.open(QIODevice.WriteOnly)
+                    buffer.open(QIODevice.OpenModeFlag.WriteOnly)
                     q_image.save(buffer, "PNG")
                     byte_array = buffer.data()
 
@@ -275,7 +275,7 @@ class KritaClient(QObject):
         converted_image = img.convertToFormat(QImage.Format.Format_ARGB32)
 
         ptr = converted_image.constBits()
-        converted_image_bytes = QByteArray(ptr.asstring(converted_image.byteCount()))
+        converted_image_bytes = QByteArray(ptr.asstring(converted_image.sizeInBytes()))
         node.setPixelData(converted_image_bytes, 0, 0, converted_image.width(), converted_image.height())
         new_layer_parent_node.addChildNode(node, None)
 

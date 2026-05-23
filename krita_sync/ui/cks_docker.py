@@ -1,8 +1,8 @@
 import uuid
 
 from krita import DockWidget  # type: ignore
-from PyQt5.QtCore import QSize, pyqtSlot
-from PyQt5.QtWidgets import QLabel, QWidget, QVBoxLayout, QHBoxLayout, QLineEdit, QPushButton, QSizePolicy, QScrollArea
+from PyQt6.QtCore import QSize, pyqtSlot
+from PyQt6.QtWidgets import QLabel, QWidget, QVBoxLayout, QHBoxLayout, QLineEdit, QPushButton, QSizePolicy, QScrollArea
 
 from krita_sync.client_krita import ConnectionState, KritaClient
 from krita_sync.ui.gen_history import GenHistoryWidget
@@ -47,9 +47,9 @@ class ComfyKritaSyncDocker(DockWidget):
         document_widget.setLayout(QHBoxLayout())
         document_widget.layout().setContentsMargins(11, 0, 11, 0)
         self.label_document_name = NoMinSizeQLabel("Current Document: -")
-        self.label_document_name.setSizePolicy(QSizePolicy.Maximum, QSizePolicy.Preferred)
+        self.label_document_name.setSizePolicy(QSizePolicy.Policy.Maximum, QSizePolicy.Policy.Preferred)
         self.label_document_uuid = QLabel(" (-)")
-        self.label_document_uuid.setSizePolicy(QSizePolicy.Fixed, QSizePolicy.Preferred)
+        self.label_document_uuid.setSizePolicy(QSizePolicy.Policy.Fixed, QSizePolicy.Policy.Preferred)
 
         document_widget.layout().addWidget(self.label_document_name)
         document_widget.layout().addWidget(self.label_document_uuid)
